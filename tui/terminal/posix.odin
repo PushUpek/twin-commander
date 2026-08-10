@@ -2,7 +2,11 @@ package tui_terminal
 
 import "core:c"
 
-foreign import libc "system:c"
+when ODIN_OS == .Darwin {
+	foreign import libc "system:System"
+} else {
+	foreign import libc "system:c"
+}
 
 Winsize :: struct {
 	rows:    u16,
@@ -12,7 +16,7 @@ Winsize :: struct {
 }
 
 foreign libc {
-	ioctl :: proc(fd: c.int, request: c.ulong, argument: rawptr) -> c.int ---
+	ioctl :: proc(fd: c.int, request: c.ulong, #c_vararg arguments: ..any) -> c.int ---
 }
 
 when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
@@ -21,16 +25,19 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	TIOCGWINSZ :: c.ulong(0x5413)
 }
 
-get_size :: proc() -> Size {
-	result := Size{width = 80, height = 24}
-	winsize: Winsize
-	if ioctl(c.int(STDOUT), TIOCGWINSZ, &winsize) == 0 {
-		if winsize.columns > 0 {
-			result.width = int(winsize.columns)
-		}
-		if winsize.rows > 0 {
-			result.height = int(winsize.rows)
-		}
+get_size :: proc() -> (Size, bool) {
+	if result, ok := get_size_for_fd(STDOUT); ok {
+		return result, true
 	}
-	return result
+	return get_size_for_fd(STDIN)
 }
+
+get_size_for_fd :: proc(fd: posix.FD) -> (Size, bool) {
+	winsize: Winsize
+	if ioctl(c.int(fd), TIOCGWINSZ, &winsize) != 0 || winsize.columns == 0 || winsize.rows == 0 {
+		return {}, false
+	}
+	return Size{width = int(winsize.columns), height = int(winsize.rows)}, true
+}
+
+import "core:sys/posix"

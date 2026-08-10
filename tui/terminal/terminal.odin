@@ -75,6 +75,11 @@ open :: proc(session: ^Session) -> bool {
 		return false
 	}
 
+	terminal_size, size_ok := get_size()
+	if !size_ok {
+		return false
+	}
+
 	raw := session.original_mode
 	raw.c_iflag -= {.BRKINT, .ICRNL, .INPCK, .ISTRIP, .IXON}
 	raw.c_oflag -= {.OPOST}
@@ -88,7 +93,7 @@ open :: proc(session: ^Session) -> bool {
 	}
 
 	session.active = true
-	session.size = get_size()
+	session.size = terminal_size
 	write("\e[?1049h\e[?25l\e[2J\e[H")
 	return true
 }
@@ -121,8 +126,8 @@ poll_event :: proc(session: ^Session, timeout_ms: int) -> (Event, bool) {
 		return {}, false
 	}
 
-	current_size := get_size()
-	if current_size != session.size {
+	current_size, size_ok := get_size()
+	if size_ok && current_size != session.size {
 		session.size = current_size
 		return Event{kind = .Resize, size = current_size}, true
 	}
