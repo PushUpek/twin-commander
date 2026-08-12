@@ -10,12 +10,14 @@ Panel_State :: struct {
 }
 
 App_State :: struct {
-	panels:       [2]Panel_State,
-	active_panel: int,
-	status:       string,
-	copying:      bool,
-	copy_name:    string,
-	copy_percent: int,
+	panels:            [2]Panel_State,
+	active_panel:      int,
+	theme_mode:        Theme_Mode,
+	status:            string,
+	overwrite_pending: bool,
+	copying:           bool,
+	copy_name:         string,
+	copy_percent:      int,
 }
 
 app_destroy :: proc(app: ^App_State) {
