@@ -67,7 +67,7 @@ Session :: struct {
 	pending_count: int,
 }
 
-STDIN  :: posix.FD(0)
+STDIN :: posix.FD(0)
 STDOUT :: posix.FD(1)
 
 open :: proc(session: ^Session) -> bool {
@@ -112,7 +112,11 @@ write :: proc(data: string) -> bool {
 	bytes := transmute([]u8)data
 	written := 0
 	for written < len(bytes) {
-		count := posix.write(STDOUT, raw_data(bytes[written:]), c.size_t(int(len(bytes))-written))
+		count := posix.write(
+			STDOUT,
+			raw_data(bytes[written:]),
+			c.size_t(int(len(bytes)) - written),
+		)
 		if count <= 0 {
 			return false
 		}
@@ -146,16 +150,12 @@ read_pending :: proc(session: ^Session, timeout_ms: int) -> bool {
 		return false
 	}
 
-	available := len(session.pending)-session.pending_count
+	available := len(session.pending) - session.pending_count
 	if available <= 0 {
 		return false
 	}
 
-	count := posix.read(
-		STDIN,
-		&session.pending[session.pending_count],
-		c.size_t(available),
-	)
+	count := posix.read(STDIN, &session.pending[session.pending_count], c.size_t(available))
 	if count <= 0 {
 		return false
 	}

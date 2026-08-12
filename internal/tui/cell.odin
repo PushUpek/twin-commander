@@ -32,4 +32,6 @@ Cell :: struct {
 	style:     Style,
 }
 
-DEFAULT_CELL :: Cell{character = ' '}
+DEFAULT_CELL :: Cell {
+	character = ' ',
+}
