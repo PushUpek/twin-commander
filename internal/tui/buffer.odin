@@ -11,7 +11,7 @@ buffer_init :: proc(buffer: ^Buffer, width, height: int) {
 	buffer_destroy(buffer)
 	buffer.width = max(width, 0)
 	buffer.height = max(height, 0)
-	buffer.cells = make([]Cell, buffer.width*buffer.height)
+	buffer.cells = make([]Cell, buffer.width * buffer.height)
 	buffer_clear(buffer)
 }
 
@@ -33,33 +33,39 @@ buffer_set :: proc(buffer: ^Buffer, x, y: int, cell: Cell) {
 	if buffer == nil || x < 0 || y < 0 || x >= buffer.width || y >= buffer.height {
 		return
 	}
-	buffer.cells[y*buffer.width+x] = cell
+	buffer.cells[y * buffer.width + x] = cell
 }
 
 buffer_get :: proc(buffer: ^Buffer, x, y: int) -> Cell {
 	if buffer == nil || x < 0 || y < 0 || x >= buffer.width || y >= buffer.height {
 		return DEFAULT_CELL
 	}
-	return buffer.cells[y*buffer.width+x]
+	return buffer.cells[y * buffer.width + x]
 }
 
 buffer_fill :: proc(buffer: ^Buffer, rect: Rect, cell: Cell) {
 	left := max(rect.x, 0)
 	top := max(rect.y, 0)
-	right := min(rect.x+rect.width, buffer.width)
-	bottom := min(rect.y+rect.height, buffer.height)
-	for y in top..<bottom {
-		for x in left..<right {
+	right := min(rect.x + rect.width, buffer.width)
+	bottom := min(rect.y + rect.height, buffer.height)
+	for y in top ..< bottom {
+		for x in left ..< right {
 			buffer_set(buffer, x, y, cell)
 		}
 	}
 }
 
-buffer_write :: proc(buffer: ^Buffer, x, y: int, text: string, style := Style{}, max_width := -1) -> int {
+buffer_write :: proc(
+	buffer: ^Buffer,
+	x, y: int,
+	text: string,
+	style := Style{},
+	max_width := -1,
+) -> int {
 	cursor := x
 	limit := buffer.width
 	if max_width >= 0 {
-		limit = min(limit, x+max_width)
+		limit = min(limit, x + max_width)
 	}
 
 	for character in text {
@@ -67,16 +73,16 @@ buffer_write :: proc(buffer: ^Buffer, x, y: int, text: string, style := Style{},
 		if width <= 0 {
 			continue
 		}
-		if cursor+width > limit {
+		if cursor + width > limit {
 			break
 		}
 		buffer_set(buffer, cursor, y, Cell{character = character, style = style})
 		if width == 2 {
-			buffer_set(buffer, cursor+1, y, Cell{character = 0, style = style})
+			buffer_set(buffer, cursor + 1, y, Cell{character = 0, style = style})
 		}
 		cursor += width
 	}
-	return cursor-x
+	return cursor - x
 }
 
 buffer_copy :: proc(destination, source: ^Buffer) {

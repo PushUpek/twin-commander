@@ -43,19 +43,19 @@ screen_render :: proc(screen: ^Screen) -> strings.Builder {
 	active_style := Style{}
 	style_valid := false
 
-	for y in 0..<screen.back.height {
+	for y in 0 ..< screen.back.height {
 		x := 0
 		for x < screen.back.width {
-			index := y*screen.back.width+x
+			index := y * screen.back.width + x
 			cell := screen.back.cells[index]
 			if !screen.force_redraw && cell == screen.front.cells[index] {
 				x += 1
 				continue
 			}
 
-			fmt.sbprintf(&output, "\e[%d;%dH", y+1, x+1)
+			fmt.sbprintf(&output, "\e[%d;%dH", y + 1, x + 1)
 			for x < screen.back.width {
-				index = y*screen.back.width+x
+				index = y * screen.back.width + x
 				cell = screen.back.cells[index]
 				if !screen.force_redraw && cell == screen.front.cells[index] {
 					break
@@ -86,7 +86,7 @@ write_style :: proc(output: ^strings.Builder, style: Style) {
 	if .Dim in style.attributes do strings.write_string(output, ";2")
 	if .Underline in style.attributes do strings.write_string(output, ";4")
 	if .Reverse in style.attributes do strings.write_string(output, ";7")
-	if style.foreground != .Default do fmt.sbprintf(output, ";%d", 29+int(style.foreground))
-	if style.background != .Default do fmt.sbprintf(output, ";%d", 39+int(style.background))
+	if style.foreground != .Default do fmt.sbprintf(output, ";%d", 29 + int(style.foreground))
+	if style.background != .Default do fmt.sbprintf(output, ";%d", 39 + int(style.background))
 	strings.write_string(output, "m")
 }

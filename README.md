@@ -18,14 +18,22 @@ Program zostanie zbudowany w katalogu `build/`.
 make run
 ```
 
-Aktualny prototyp wyświetla dwa testowe panele. `Tab` przełącza aktywny panel,
-strzałki `↑`/`↓` zmieniają zaznaczenie, a `Esc` lub `Ctrl-C` kończy program.
+Każdy panel wyświetla zawartość własnego katalogu. Obsługiwane klawisze:
 
-## TUI
+- `↑`/`↓` — zmiana zaznaczenia,
+- `Enter` — wejście do zaznaczonego katalogu (wpis `..` przechodzi wyżej),
+- `Tab` — przełączenie aktywnego panelu,
+- `F5` — skopiowanie zaznaczonego pliku do katalogu w drugim panelu,
+- `Esc` lub `Ctrl-C` — zakończenie programu.
 
-Warstwa terminalowa i renderer znajdują się w osobnym, wewnętrznym pakiecie
-`tui/`. Aplikacja korzysta wyłącznie z jego publicznej fasady, natomiast kod
-zależny od POSIX jest odizolowany w `tui/terminal/`.
+Podczas kopiowania pasek stanu pokazuje procentowy postęp operacji. Istniejący
+plik o tej samej nazwie w panelu docelowym zostanie zastąpiony.
+
+## Architektura
+
+Punkty wejścia programów znajdują się w `cmd/`, a kod współdzielony w
+`internal/`. Główna aplikacja jest podzielona na pakiety `commander`, `fsops`
+i `tui`. Kod zależny od POSIX pozostaje odizolowany w `internal/tui/terminal/`.
 
 Testy pakietu można uruchomić poleceniem:
 
