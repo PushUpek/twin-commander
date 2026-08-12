@@ -1,7 +1,7 @@
 package tui
 
-import "core:strings"
 import term "./terminal"
+import "core:strings"
 
 Event :: term.Event
 Event_Kind :: term.Event_Kind
