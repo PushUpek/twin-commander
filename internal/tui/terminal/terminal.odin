@@ -2,6 +2,7 @@ package tui_terminal
 
 import "core:c"
 import "core:sys/posix"
+import "core:time"
 
 Size :: struct {
 	width:  int,
@@ -49,22 +50,40 @@ Event_Kind :: enum {
 	Key,
 	Text,
 	Resize,
+	Appearance,
+}
+
+Appearance :: enum {
+	Unknown,
+	Dark,
+	Light,
+}
+
+Appearance_Source :: enum {
+	Unknown,
+	Background,
+	Preference,
 }
 
 Event :: struct {
-	kind:      Event_Kind,
-	key:       Key,
-	text:      rune,
-	modifiers: Modifiers,
-	size:      Size,
+	kind:              Event_Kind,
+	key:               Key,
+	text:              rune,
+	modifiers:         Modifiers,
+	size:              Size,
+	appearance:        Appearance,
+	appearance_source: Appearance_Source,
 }
 
 Session :: struct {
-	original_mode: posix.termios,
-	active:        bool,
-	size:          Size,
-	pending:       [256]u8,
-	pending_count: int,
+	original_mode:         posix.termios,
+	active:                bool,
+	size:                  Size,
+	pending:               [256]u8,
+	pending_count:         int,
+	appearance:            Appearance,
+	preference_supported:  bool,
+	last_appearance_query: time.Tick,
 }
 
 STDIN :: posix.FD(0)
@@ -94,7 +113,8 @@ open :: proc(session: ^Session) -> bool {
 
 	session.active = true
 	session.size = terminal_size
-	write("\e[?1049h\e[?25l\e[2J\e[H")
+	write("\e[?1049h\e[?25l\e[2J\e[H\e[?2031h")
+	request_appearance(session)
 	return true
 }
 
@@ -103,7 +123,7 @@ close :: proc(session: ^Session) {
 		return
 	}
 
-	write("\e[0m\e[?25h\e[?1049l")
+	write("\e[?2031l\e[0m\e[?25h\e[?1049l")
 	posix.tcsetattr(STDIN, .TCSAFLUSH, &session.original_mode)
 	session.active = false
 }
@@ -135,12 +155,39 @@ poll_event :: proc(session: ^Session, timeout_ms: int) -> (Event, bool) {
 		session.size = current_size
 		return Event{kind = .Resize, size = current_size}, true
 	}
+	if time.tick_since(session.last_appearance_query) >= time.Second {
+		request_appearance(session)
+	}
 
-	if session.pending_count == 0 && !read_pending(session, timeout_ms) {
+	effective_timeout := timeout_ms
+	if effective_timeout < 0 || effective_timeout > 1000 {
+		effective_timeout = 1000
+	}
+	if session.pending_count == 0 && !read_pending(session, effective_timeout) {
 		return {}, false
 	}
 
-	return parse_pending(session)
+	event, ok := parse_pending(session)
+	if ok && event.kind == .Appearance {
+		if event.appearance_source == .Preference {
+			session.preference_supported = true
+		} else if session.preference_supported {
+			return {}, false
+		}
+		if event.appearance == session.appearance {
+			return {}, false
+		}
+		session.appearance = event.appearance
+	}
+	return event, ok
+}
+
+request_appearance :: proc(session: ^Session) {
+	if session == nil || !session.active {
+		return
+	}
+	write("\e[?996n\e]11;?\e\\")
+	session.last_appearance_query = time.tick_now()
 }
 
 read_pending :: proc(session: ^Session, timeout_ms: int) -> bool {

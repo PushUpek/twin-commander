@@ -55,6 +55,20 @@ Run :: proc() {
 }
 
 handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, running: ^bool) {
+	if event.kind == .Appearance {
+		if event.appearance == .Light {
+			app.theme_mode = .Light
+		} else if event.appearance == .Dark {
+			app.theme_mode = .Dark
+		}
+		return
+	}
+
+	if app.overwrite_pending {
+		handle_overwrite_event(ctx, app, event)
+		return
+	}
+
 	#partial switch event.kind {
 	case .Key:
 		#partial switch event.key {

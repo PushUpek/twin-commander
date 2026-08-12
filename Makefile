@@ -18,7 +18,9 @@ $(TARGET): $(ODIN_SOURCES)
 .PHONY: test
 test:
 	$(ODIN) test ./internal/tui $(ODIN_FLAGS)
+	$(ODIN) test ./internal/tui/terminal $(ODIN_FLAGS)
 	$(ODIN) test ./internal/fsops $(ODIN_FLAGS)
+	$(ODIN) test ./internal/commander $(ODIN_FLAGS)
 
 run: build
 	./$(TARGET)
