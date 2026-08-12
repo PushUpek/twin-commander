@@ -6,8 +6,14 @@ import "tc:internal/tui"
 draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	buffer := tui.begin_frame(ctx)
 	width, height := tui.size(ctx)
+	theme := theme_for(app.theme_mode)
+	tui.buffer_fill(
+		buffer,
+		tui.Rect{x = 0, y = 0, width = width, height = height},
+		tui.Cell{character = ' ', style = theme.screen},
+	)
 	if width < 20 || height < 8 {
-		tui.buffer_write(buffer, 0, 0, "Terminal jest zbyt mały", tui.Style{foreground = .Yellow})
+		tui.buffer_write(buffer, 0, 0, "Terminal jest zbyt mały", theme.dialog_accent)
 		return
 	}
 
@@ -19,22 +25,20 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		tui.Rect{x = 0, y = 0, width = left_width, height = panel_height},
 		&app.panels[0],
 		app.active_panel == 0,
+		theme,
 	)
 	draw_panel(
 		buffer,
 		tui.Rect{x = left_width, y = 0, width = width - left_width, height = panel_height},
 		&app.panels[1],
 		app.active_panel == 1,
+		theme,
 	)
 
-	status_style := tui.Style {
-		foreground = .Black,
-		background = .Cyan,
-	}
 	tui.buffer_fill(
 		buffer,
 		tui.Rect{x = 0, y = height - 2, width = width, height = 1},
-		tui.Cell{character = ' ', style = status_style},
+		tui.Cell{character = ' ', style = theme.status},
 	)
 	if app.copying {
 		status_buffer: [512]byte
@@ -44,40 +48,70 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 			app.copy_name,
 			app.copy_percent,
 		)
-		tui.buffer_write(buffer, 1, height - 2, status, status_style, width - 2)
+		tui.buffer_write(buffer, 1, height - 2, status, theme.status, width - 2)
 	} else {
-		tui.buffer_write(buffer, 1, height - 2, app.status, status_style, width - 2)
+		tui.buffer_write(buffer, 1, height - 2, app.status, theme.status, width - 2)
 	}
 
-	keys_style := tui.Style {
-		foreground = .Black,
-		background = .White,
-	}
 	tui.buffer_fill(
 		buffer,
 		tui.Rect{x = 0, y = height - 1, width = width, height = 1},
-		tui.Cell{character = ' ', style = keys_style},
+		tui.Cell{character = ' ', style = theme.keys},
 	)
 	tui.buffer_write(
 		buffer,
 		0,
 		height - 1,
 		"Tab Panel  Enter Otwórz  ↑/↓ Wybór  F5 Kopiuj  Esc Koniec",
-		keys_style,
+		theme.keys,
 		width,
 	)
+
+	if app.overwrite_pending {
+		draw_overwrite_dialog(buffer, width, height, app.copy_name, theme)
+	} else if app.copying {
+		draw_copy_progress_dialog(buffer, width, height, app.copy_name, app.copy_percent, theme)
+	}
 }
 
-draw_panel :: proc(buffer: ^tui.Buffer, rect: tui.Rect, state: ^Panel_State, active: bool) {
-	border_style := tui.Style {
-		foreground = .White,
-		attributes = {.Dim},
-	}
+draw_overwrite_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	file_name: string,
+	theme: Theme,
+) {
+	dialog := dialog_open(buffer, width, height, 7, "Potwierdzenie", theme)
+	dialog_write(dialog, 2, "Plik docelowy już istnieje:")
+	dialog_write(dialog, 3, file_name, .Accent)
+	dialog_write(dialog, 5, " Enter/T Nadpisz    Esc/N Anuluj ", .Action)
+}
+
+draw_copy_progress_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	file_name: string,
+	percent: int,
+	theme: Theme,
+) {
+	dialog := dialog_open(buffer, width, height, 7, "Kopiowanie", theme)
+	dialog_write(dialog, 2, file_name)
+	dialog_progress(dialog, 4, percent)
+	percent_text: [16]byte
+	text := fmt.bprintf(percent_text[:], "%d%%", percent)
+	text_x := dialog.rect.x + (dialog.rect.width - len(text)) / 2
+	tui.buffer_write(buffer, text_x, dialog.rect.y + 5, text, theme.dialog_accent)
+}
+
+draw_panel :: proc(
+	buffer: ^tui.Buffer,
+	rect: tui.Rect,
+	state: ^Panel_State,
+	active: bool,
+	theme: Theme,
+) {
+	border_style := theme.panel_border_inactive
 	if active {
-		border_style = tui.Style {
-			foreground = .White,
-			attributes = {.Bold},
-		}
+		border_style = theme.panel_border_active
 	}
 	draw_box(buffer, rect, border_style)
 	tui.buffer_set(buffer, rect.x + 1, rect.y, tui.Cell{character = ' ', style = border_style})
@@ -108,20 +142,14 @@ draw_panel :: proc(buffer: ^tui.Buffer, rect: tui.Rect, state: ^Panel_State, act
 	item_count := panel_item_count(state)
 	for row in 0 ..< min(visible_rows, item_count - state.offset) {
 		index := state.offset + row
-		row_style := tui.Style {
-			foreground = .White,
-			attributes = {.Dim},
-		}
+		row_style := theme.panel_row_inactive
 		if active {
-			row_style = {}
+			row_style = theme.panel_row_active
 		}
 		if active && index == state.selected {
-			row_style = tui.Style {
-				foreground = .Black,
-				background = .Cyan,
-			}
+			row_style = theme.selection_active
 		} else if index == state.selected {
-			row_style.attributes += {.Underline}
+			row_style = theme.selection_inactive
 		}
 		tui.buffer_fill(
 			buffer,
