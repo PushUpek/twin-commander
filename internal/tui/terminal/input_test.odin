@@ -1,0 +1,62 @@
+package tui_terminal
+
+import "core:testing"
+
+@(test)
+osc_11_classifies_dark_and_light_backgrounds :: proc(t: ^testing.T) {
+	dark := session_with_pending("\e]11;rgb:1111/2222/3333\e\\")
+	event, ok := parse_pending(&dark)
+	testing.expect(t, ok)
+	testing.expect_value(t, event.kind, Event_Kind.Appearance)
+	testing.expect_value(t, event.appearance, Appearance.Dark)
+	testing.expect_value(t, event.appearance_source, Appearance_Source.Background)
+	testing.expect_value(t, dark.pending_count, 0)
+
+	light := session_with_pending("\e]11;rgb:eeee/ffff/dddd\a")
+	event, ok = parse_pending(&light)
+	testing.expect(t, ok)
+	testing.expect_value(t, event.kind, Event_Kind.Appearance)
+	testing.expect_value(t, event.appearance, Appearance.Light)
+	testing.expect_value(t, light.pending_count, 0)
+}
+
+@(test)
+color_scheme_preference_reports_are_parsed :: proc(t: ^testing.T) {
+	dark := session_with_pending("\e[?997;1n")
+	event, ok := parse_pending(&dark)
+	testing.expect(t, ok)
+	testing.expect_value(t, event.appearance, Appearance.Dark)
+	testing.expect_value(t, event.appearance_source, Appearance_Source.Preference)
+
+	light := session_with_pending("\e[?997;2n")
+	event, ok = parse_pending(&light)
+	testing.expect(t, ok)
+	testing.expect_value(t, event.appearance, Appearance.Light)
+	testing.expect_value(t, event.appearance_source, Appearance_Source.Preference)
+}
+
+@(test)
+incomplete_osc_response_remains_buffered :: proc(t: ^testing.T) {
+	session := session_with_pending("\e]11;rgb:ffff/ffff")
+	_, ok := parse_pending(&session)
+	testing.expect(t, !ok)
+	testing.expect_value(t, session.pending_count, len("\e]11;rgb:ffff/ffff"))
+
+	rest: string = "/ffff\e\\"
+	rest_bytes := transmute([]u8)rest
+	copy(session.pending[session.pending_count:], rest_bytes)
+	session.pending_count += len(rest_bytes)
+	event: Event
+	event, ok = parse_pending(&session)
+	testing.expect(t, ok)
+	testing.expect_value(t, event.appearance, Appearance.Light)
+	testing.expect_value(t, session.pending_count, 0)
+}
+
+session_with_pending :: proc(value: string) -> Session {
+	session: Session
+	bytes := transmute([]u8)value
+	copy(session.pending[:], bytes)
+	session.pending_count = len(bytes)
+	return session
+}

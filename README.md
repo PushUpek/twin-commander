@@ -26,8 +26,15 @@ Każdy panel wyświetla zawartość własnego katalogu. Obsługiwane klawisze:
 - `F5` — skopiowanie zaznaczonego pliku do katalogu w drugim panelu,
 - `Esc` lub `Ctrl-C` — zakończenie programu.
 
-Podczas kopiowania pasek stanu pokazuje procentowy postęp operacji. Istniejący
-plik o tej samej nazwie w panelu docelowym zostanie zastąpiony.
+Podczas kopiowania pływające okno pokazuje procentowy postęp operacji. Jeśli plik
+o tej samej nazwie już istnieje w panelu docelowym, program najpierw poprosi o
+potwierdzenie jego nadpisania.
+
+Interfejs ma domyślne motywy jasny i ciemny. Program korzysta z raportów
+preferencji systemowej `CSI ? 996 n` i powiadomień trybu `2031`, aby przełączać
+motyw od razu po zmianie ustawień. Dla starszych terminali okresowo odczytuje
+kolor tła przez OSC 11. Terminale bez obsługi obu mechanizmów korzystają z
+motywu ciemnego.
 
 ## Architektura
 
