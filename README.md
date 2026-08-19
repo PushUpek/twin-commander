@@ -18,7 +18,12 @@ Program zostanie zbudowany w katalogu `build/`.
 make run
 ```
 
-Każdy panel wyświetla zawartość własnego katalogu. Obsługiwane klawisze:
+Każdy panel wyświetla zawartość własnego katalogu. Pierwsza kolumna panelu
+zawiera przenośne ikony Unicode oznaczające katalogi oraz
+popularne kategorie plików (m.in. kod, tekst, obrazy, archiwa, multimedia i dane).
+Nie wymagają one czcionki Nerd Font.
+
+Obsługiwane klawisze:
 
 - `↑`/`↓` — zmiana zaznaczenia,
 - `Enter` — wejście do zaznaczonego katalogu (wpis `..` przechodzi wyżej),

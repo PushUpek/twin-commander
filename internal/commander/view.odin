@@ -2,8 +2,11 @@ package commander
 
 import "core:fmt"
 import "core:os"
+import "core:path/filepath"
+import "core:strings"
 import "tc:internal/tui"
 
+PANEL_ICON_WIDTH :: 1
 PANEL_SIZE_WIDTH :: 7
 PANEL_PERMISSIONS_WIDTH :: 11
 PANEL_COLUMN_GAP :: 1
@@ -226,8 +229,11 @@ draw_panel :: proc(
 
 	content_x := rect.x + 2
 	content_width := max(rect.width - 4, 0)
+	name_x := content_x + PANEL_ICON_WIDTH + PANEL_COLUMN_GAP
 	show_metadata :=
 		content_width >=
+		PANEL_ICON_WIDTH +
+			PANEL_COLUMN_GAP +
 		PANEL_MIN_NAME_WIDTH +
 			PANEL_COLUMN_GAP +
 			PANEL_SIZE_WIDTH +
@@ -237,7 +243,7 @@ draw_panel :: proc(
 	if show_metadata {
 		permissions_x := content_x + content_width - PANEL_PERMISSIONS_WIDTH
 		size_x := permissions_x - PANEL_COLUMN_GAP - PANEL_SIZE_WIDTH
-		tui.buffer_write(buffer, content_x, rows_y, "Nazwa", border_style, size_x - content_x)
+		tui.buffer_write(buffer, name_x, rows_y, "Nazwa", border_style, size_x - name_x)
 		tui.buffer_write(buffer, size_x, rows_y, "Rozmiar", border_style, PANEL_SIZE_WIDTH)
 		tui.buffer_write(
 			buffer,
@@ -286,28 +292,25 @@ draw_panel :: proc(
 			tui.Cell{character = ' ', style = row_style},
 		)
 
+		icon := rune('↰')
 		name := ".."
-		name_buffer: [1024]byte
 		size := "-"
 		size_buffer: [16]byte
 		permissions := "-"
 		permissions_buffer: [9]byte
 		if index > 0 {
 			file := state.files[index - 1]
-			if file.type == .Directory {
-				name = fmt.bprintf(name_buffer[:], "[%s]", file.name)
-			} else {
-				name = file.name
-			}
+			icon = file_type_icon(file)
+			name = file.name
 			size = format_file_size(size_buffer[:], file.size)
 			permissions = format_permissions(permissions_buffer[:], file.mode)
 		}
 
-		name_width := content_width
+		name_width := max(content_width - PANEL_ICON_WIDTH - PANEL_COLUMN_GAP, 0)
 		if show_metadata {
 			permissions_x := content_x + content_width - PANEL_PERMISSIONS_WIDTH
 			size_x := permissions_x - PANEL_COLUMN_GAP - PANEL_SIZE_WIDTH
-			name_width = size_x - PANEL_COLUMN_GAP - content_x
+			name_width = size_x - PANEL_COLUMN_GAP - name_x
 			size_text_x := size_x + PANEL_SIZE_WIDTH - len(size)
 			permissions_text_x := permissions_x + PANEL_PERMISSIONS_WIDTH - len(permissions)
 			tui.buffer_write(buffer, size_text_x, row_y, size, row_style, PANEL_SIZE_WIDTH)
@@ -320,8 +323,66 @@ draw_panel :: proc(
 				PANEL_PERMISSIONS_WIDTH,
 			)
 		}
-		tui.buffer_write(buffer, content_x, row_y, name, row_style, name_width)
+		tui.buffer_set(buffer, content_x, row_y, tui.Cell{character = icon, style = row_style})
+		tui.buffer_write(buffer, name_x, row_y, name, row_style, name_width)
 	}
+}
+
+file_type_icon :: proc(file: os.File_Info) -> rune {
+	switch file.type {
+	case .Directory:
+		return '▸'
+	case .Symlink:
+		return '↗'
+	case .Named_Pipe:
+		return '│'
+	case .Socket:
+		return '◉'
+	case .Block_Device, .Character_Device:
+		return '■'
+	case .Undetermined:
+		return '?'
+	case .Regular:
+	}
+
+	extension := filepath.ext(file.name)
+	if extension_matches(extension, []string{".c", ".cc", ".cpp", ".css", ".go", ".h", ".hpp", ".html", ".java", ".js", ".jsx", ".odin", ".php", ".py", ".rb", ".rs", ".sh", ".swift", ".ts", ".tsx"}) {
+		return 'λ'
+	}
+	if extension_matches(extension, []string{".bmp", ".gif", ".heic", ".jpeg", ".jpg", ".png", ".svg", ".tif", ".tiff", ".webp"}) {
+		return '◈'
+	}
+	if extension_matches(extension, []string{".7z", ".bz2", ".gz", ".rar", ".tar", ".tgz", ".xz", ".zip"}) {
+		return '▣'
+	}
+	if extension_matches(extension, []string{".aac", ".flac", ".m4a", ".mp3", ".ogg", ".wav"}) {
+		return '♪'
+	}
+	if extension_matches(extension, []string{".avi", ".m4v", ".mkv", ".mov", ".mp4", ".webm"}) {
+		return '▶'
+	}
+	if extension_matches(extension, []string{".csv", ".db", ".json", ".sql", ".toml", ".tsv", ".xml", ".yaml", ".yml"}) {
+		return '▦'
+	}
+	if extension_matches(extension, []string{".doc", ".docx", ".odt", ".pdf", ".ppt", ".pptx", ".xls", ".xlsx"}) {
+		return '¶'
+	}
+	if extension_matches(extension, []string{".log", ".md", ".rst", ".txt"}) {
+		return '≡'
+	}
+	if strings.equal_fold(file.name, "Makefile") || strings.equal_fold(file.name, "Dockerfile") {
+		return 'λ'
+	}
+	return '·'
+}
+
+extension_matches :: proc(extension: string, candidates: []string) -> bool {
+	for candidate in candidates {
+		if strings.equal_fold(extension, candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 format_file_size :: proc(buffer: []byte, size: i64) -> string {
