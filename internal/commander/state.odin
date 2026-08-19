@@ -18,10 +18,16 @@ App_State :: struct {
 	theme_overridden:  bool,
 	status:            string,
 	overwrite_pending: bool,
+	copy_edit_pending: bool,
+	move_edit_pending: bool,
 	move_pending:      bool,
 	delete_pending:    bool,
 	copying:           bool,
 	copy_name:         string,
+	copy_target_name:  string,
+	copy_name_cursor:  int,
+	move_name:         string,
+	move_name_cursor:  int,
 	pending_name:      string,
 	pending_count:     int,
 	copy_percent:      int,
@@ -33,6 +39,8 @@ app_destroy :: proc(app: ^App_State) {
 	}
 	destroy_theme(&app.theme)
 	delete(app.status)
+	delete(app.copy_target_name)
+	delete(app.move_name)
 }
 
 set_status :: proc(app: ^App_State, status: string) {

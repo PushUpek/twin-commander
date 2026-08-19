@@ -81,7 +81,7 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		buffer,
 		0,
 		height - 1,
-		"F3 Podgląd  F4 Edycja  F5 Kopiuj  F6 Przenieś  F8 Usuń  Tab Panel  Esc Koniec",
+		"F3 Podgląd  F4 Edycja  F5 Kopiuj jako  F6 Przenieś/Zmień nazwę  F8 Usuń  Tab Panel  Esc Koniec",
 		theme.keys,
 		width,
 	)
@@ -92,6 +92,19 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		} else {
 			draw_overwrite_dialog(buffer, width, height, app.copy_name, theme)
 		}
+	} else if app.copy_edit_pending {
+		draw_name_edit_dialog(
+			buffer,
+			width,
+			height,
+			app.copy_target_name,
+			app.copy_name_cursor,
+			"Kopiuj jako",
+			"Enter Kopiuj",
+			theme,
+		)
+	} else if app.move_edit_pending {
+		draw_move_edit_dialog(buffer, width, height, app.move_name, app.move_name_cursor, theme)
 	} else if app.move_pending {
 		if app.pending_count > 1 {
 			draw_bulk_confirmation_dialog(buffer, width, height, app.pending_name, app.pending_count, .Move, theme)
@@ -107,6 +120,55 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	} else if app.copying {
 		draw_copy_progress_dialog(buffer, width, height, app.copy_name, app.copy_percent, theme)
 	}
+}
+
+draw_move_edit_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	entry_name: string,
+	cursor: int,
+	theme: Theme,
+) {
+	draw_name_edit_dialog(
+		buffer,
+		width,
+		height,
+		entry_name,
+		cursor,
+		"Przenieś / zmień nazwę",
+		"Enter Przenieś",
+		theme,
+	)
+}
+
+draw_name_edit_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	entry_name: string,
+	cursor: int,
+	title, submit_label: string,
+	theme: Theme,
+) {
+	dialog := dialog_open(buffer, width, height, 8, title, theme)
+	dialog_write(dialog, 2, "Nazwa w katalogu docelowym:")
+	field := tui.Rect {
+		x = dialog.rect.x + 3,
+		y = dialog.rect.y + 3,
+		width = dialog.rect.width - 6,
+		height = 1,
+	}
+	tui.buffer_fill(buffer, field, tui.Cell{character = ' ', style = theme.dialog_accent})
+	tui.buffer_write(buffer, field.x, field.y, entry_name, theme.dialog_accent, field.width)
+	bounded_cursor := clamp(cursor, 0, len(entry_name))
+	cursor_width := tui.buffer_write(buffer, field.x, field.y, entry_name[:bounded_cursor], theme.dialog_accent, field.width)
+	if cursor_width < field.width {
+		cursor_cell := tui.buffer_get(buffer, field.x + cursor_width, field.y)
+		cursor_cell.style = theme.dialog_action
+		tui.buffer_set(buffer, field.x + cursor_width, field.y, cursor_cell)
+	}
+	actions := fmt.aprintf(" %s   Esc Anuluj ", submit_label)
+	defer delete(actions)
+	dialog_write(dialog, 6, actions, .Action)
 }
 
 Bulk_Confirmation_Kind :: enum {

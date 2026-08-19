@@ -82,6 +82,14 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		handle_overwrite_event(ctx, app, event)
 		return
 	}
+	if app.copy_edit_pending {
+		handle_copy_edit_event(ctx, app, event)
+		return
+	}
+	if app.move_edit_pending {
+		handle_move_edit_event(app, event)
+		return
+	}
 	if app.move_pending {
 		handle_move_overwrite_event(app, event)
 		return
