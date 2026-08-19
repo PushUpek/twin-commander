@@ -13,42 +13,39 @@ Copy_UI_Context :: struct {
 }
 
 copy_selected_file :: proc(ctx: ^tui.Context, app: ^App_State) {
-	file, destination_path, ok := selected_copy(app)
-	defer delete(destination_path)
-	if !ok {
-		return
-	}
+	entries, ok := copy_entries(app)
+	defer delete(entries)
+	if !ok do return
 
-	destination_info, destination_err := os.stat(destination_path, context.allocator)
-	if destination_err == nil {
-		os.file_info_delete(destination_info, context.allocator)
-		app.overwrite_pending = true
-		app.copy_name = file.name
-		return
+	for file in entries {
+		destination_path, path_ok := copy_destination(app, file)
+		if !path_ok {
+			delete(destination_path)
+			return
+		}
+		destination_info, destination_err := os.stat(destination_path, context.allocator)
+		delete(destination_path)
+		if destination_err == nil {
+			os.file_info_delete(destination_info, context.allocator)
+			app.overwrite_pending = true
+			app.copy_name = file.name
+			app.pending_count = len(entries)
+			return
+		}
+		if destination_err != .Not_Exist {
+			set_status(app, fmt.aprintf("Nie można sprawdzić celu %s: %s", file.name, os.error_string(destination_err)))
+			return
+		}
 	}
-	if destination_err != .Not_Exist {
-		set_status(
-			app,
-			fmt.aprintf(
-				"Nie można sprawdzić celu %s: %s",
-				file.name,
-				os.error_string(destination_err),
-			),
-		)
-		return
-	}
-
 	perform_copy(ctx, app, false)
 }
 
 handle_overwrite_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event) {
 	choice := confirmation_choice(event)
-	if choice == .None {
-		return
-	}
-
+	if choice == .None do return
 	app.overwrite_pending = false
 	app.copy_name = ""
+	app.pending_count = 0
 	if choice == .No {
 		set_status(app, strings.clone("Anulowano kopiowanie") or_else "")
 		return
@@ -56,91 +53,83 @@ handle_overwrite_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Ev
 	perform_copy(ctx, app, true)
 }
 
-selected_copy :: proc(app: ^App_State) -> (os.File_Info, string, bool) {
-	source_panel := &app.panels[app.active_panel]
-	destination_panel := &app.panels[1 - app.active_panel]
-	if source_panel.selected == 0 {
+copy_entries :: proc(app: ^App_State) -> ([dynamic]os.File_Info, bool) {
+	entries := panel_operation_entries(&app.panels[app.active_panel])
+	if len(entries) == 0 {
 		set_status(app, strings.clone("Wybierz plik lub katalog do skopiowania") or_else "")
-		return {}, "", false
+		return entries, false
 	}
-
-	file := source_panel.files[source_panel.selected - 1]
-	if file.type != .Regular && file.type != .Directory {
-		set_status(
-			app,
-			fmt.aprintf("F5 kopiuje pliki i katalogi; %s ma nieobsługiwany typ", file.name),
-		)
-		return {}, "", false
+	for file in entries {
+		if file.type != .Regular && file.type != .Directory {
+			set_status(app, fmt.aprintf("F5 kopiuje pliki i katalogi; %s ma nieobsługiwany typ", file.name))
+			return entries, false
+		}
+		destination_path, destination_ok := copy_destination(app, file)
+		delete(destination_path)
+		if !destination_ok do return entries, false
 	}
+	return entries, true
+}
 
+copy_destination :: proc(app: ^App_State, file: os.File_Info) -> (string, bool) {
+	destination_panel := &app.panels[1 - app.active_panel]
 	destination_path := filepath.join({destination_panel.path, file.name}) or_else ""
 	if len(destination_path) == 0 {
 		set_status(app, strings.clone("Nie udało się zbudować ścieżki docelowej") or_else "")
-		return {}, destination_path, false
+		return destination_path, false
 	}
 	if file.fullpath == destination_path {
 		set_status(app, strings.clone("Źródło i cel są tym samym elementem") or_else "")
-		return {}, destination_path, false
+		return destination_path, false
 	}
 	if file.type == .Directory && path_is_inside(destination_panel.path, file.fullpath) {
-		set_status(
-			app,
-			strings.clone("Nie można skopiować katalogu do jego wnętrza") or_else "",
-		)
-		return {}, destination_path, false
+		set_status(app, strings.clone("Nie można skopiować katalogu do jego wnętrza") or_else "")
+		return destination_path, false
 	}
-	return file, destination_path, true
+	return destination_path, true
 }
 
 perform_copy :: proc(ctx: ^tui.Context, app: ^App_State, replace: bool) {
-	file, destination_path, ok := selected_copy(app)
-	defer delete(destination_path)
-	if !ok {
-		return
-	}
+	entries, ok := copy_entries(app)
+	defer delete(entries)
+	if !ok do return
+	source_panel := &app.panels[app.active_panel]
 	destination_panel := &app.panels[1 - app.active_panel]
-
 	app.copying = true
-	app.copy_name = file.name
-	progress_context := Copy_UI_Context {
-		tui = ctx,
-		app = app,
+	progress_context := Copy_UI_Context{tui = ctx, app = app}
+	for file, index in entries {
+		destination_path, path_ok := copy_destination(app, file)
+		if !path_ok {
+			delete(destination_path)
+			app.copying = false
+			return
+		}
+		app.copy_name = file.name
+		app.copy_percent = 0
+		progress_proc: fsops.Progress_Proc
+		progress_data: rawptr
+		if ctx != nil {
+			progress_proc = on_copy_progress
+			progress_data = rawptr(&progress_context)
+		}
+		copy_err := fsops.Copy_Entry(file.fullpath, destination_path, replace, progress_proc, progress_data)
+		delete(destination_path)
+		if copy_err != nil {
+			app.copying = false
+			app.copy_name = ""
+			panel_refresh(destination_panel)
+			set_status(app, fmt.aprintf("Błąd kopiowania %s (%d/%d): %s", file.name, index + 1, len(entries), os.error_string(copy_err)))
+			return
+		}
 	}
-	progress_proc: fsops.Progress_Proc
-	progress_data: rawptr
-	if ctx != nil {
-		progress_proc = on_copy_progress
-		progress_data = rawptr(&progress_context)
-	}
-	copy_err := fsops.Copy_Entry(
-		file.fullpath,
-		destination_path,
-		replace,
-		progress_proc,
-		progress_data,
-	)
 	app.copying = false
 	app.copy_name = ""
-
-	if copy_err != nil {
-		set_status(
-			app,
-			fmt.aprintf("Błąd kopiowania %s: %s", file.name, os.error_string(copy_err)),
-		)
-		return
-	}
+	panel_clear_marks(source_panel)
 	if refresh_err := panel_refresh(destination_panel); refresh_err != nil {
-		set_status(
-			app,
-			fmt.aprintf(
-				"Skopiowano %s, ale nie udało się odświeżyć panelu: %s",
-				file.name,
-				os.error_string(refresh_err),
-			),
-		)
+		set_status(app, fmt.aprintf("Skopiowano %d elementów, ale nie udało się odświeżyć panelu", len(entries)))
 		return
 	}
-	set_status(app, fmt.aprintf("Skopiowano %s do %s", file.name, destination_panel.path))
+	set_status(app, fmt.aprintf("Skopiowano %d elementów do %s", len(entries), destination_panel.path))
 }
 
 on_copy_progress :: proc(percent: int, user_data: rawptr) -> bool {

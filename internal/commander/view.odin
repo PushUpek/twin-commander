@@ -78,20 +78,68 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		buffer,
 		0,
 		height - 1,
-		"Tab Panel  Enter Otwórz  ↑/↓ Wybór  F5 Kopiuj  F6 Przenieś  F8 Usuń  Esc Koniec",
+		"Spacja Oznacz  Tab Panel  Enter Otwórz  F5 Kopiuj  F6 Przenieś  F8 Usuń  Esc Koniec",
 		theme.keys,
 		width,
 	)
 
 	if app.overwrite_pending {
-		draw_overwrite_dialog(buffer, width, height, app.copy_name, theme)
+		if app.pending_count > 1 {
+			draw_bulk_confirmation_dialog(buffer, width, height, app.copy_name, app.pending_count, .Copy, theme)
+		} else {
+			draw_overwrite_dialog(buffer, width, height, app.copy_name, theme)
+		}
 	} else if app.move_pending {
-		draw_move_overwrite_dialog(buffer, width, height, app.pending_name, theme)
+		if app.pending_count > 1 {
+			draw_bulk_confirmation_dialog(buffer, width, height, app.pending_name, app.pending_count, .Move, theme)
+		} else {
+			draw_move_overwrite_dialog(buffer, width, height, app.pending_name, theme)
+		}
 	} else if app.delete_pending {
-		draw_delete_dialog(buffer, width, height, app.pending_name, theme)
+		if app.pending_count > 1 {
+			draw_bulk_confirmation_dialog(buffer, width, height, app.pending_name, app.pending_count, .Delete, theme)
+		} else {
+			draw_delete_dialog(buffer, width, height, app.pending_name, theme)
+		}
 	} else if app.copying {
 		draw_copy_progress_dialog(buffer, width, height, app.copy_name, app.copy_percent, theme)
 	}
+}
+
+Bulk_Confirmation_Kind :: enum {
+	Copy,
+	Move,
+	Delete,
+}
+
+draw_bulk_confirmation_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	entry_name: string,
+	entry_count: int,
+	kind: Bulk_Confirmation_Kind,
+	theme: Theme,
+) {
+	title := "Potwierdzenie operacji"
+	question := "Wykonać operację na oznaczonych elementach?"
+	#partial switch kind {
+	case .Copy:
+		title = "Potwierdzenie kopiowania"
+		question = "Cel już istnieje; nadpisać w całym zestawie?"
+	case .Move:
+		title = "Potwierdzenie przeniesienia"
+		question = "Cel już istnieje; nadpisać w całym zestawie?"
+	case .Delete:
+		title = "Potwierdzenie usunięcia"
+		question = "Czy na pewno usunąć oznaczony zestaw?"
+	}
+	dialog := dialog_open(buffer, width, height, 8, title, theme)
+	dialog_write(dialog, 2, question)
+	count_buffer: [64]byte
+	count_text := fmt.bprintf(count_buffer[:], "Liczba elementów: %d", entry_count)
+	dialog_write(dialog, 3, count_text, .Accent)
+	dialog_write(dialog, 4, entry_name)
+	dialog_write(dialog, 6, " Enter/T Tak   Esc/N Nie ", .Action)
 }
 
 draw_move_overwrite_dialog :: proc(
@@ -221,6 +269,16 @@ draw_panel :: proc(
 			row_style = theme.selection_active
 		} else if index == state.selected {
 			row_style = theme.selection_inactive
+		}
+		marked := index > 0 && panel_is_marked(state, state.files[index - 1].name)
+		if marked {
+			row_style = theme.marked_inactive
+			if active {
+				row_style = theme.marked_active
+			}
+			if index == state.selected {
+				row_style.attributes += {.Bold, .Underline}
+			}
 		}
 		tui.buffer_fill(
 			buffer,
