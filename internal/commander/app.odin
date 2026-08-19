@@ -114,6 +114,8 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 	case .Text:
 		if .Control in event.modifiers && event.text == 'c' {
 			running^ = false
+		} else if event.text == ' ' {
+			panel_toggle_mark(&app.panels[app.active_panel])
 		}
 	}
 }

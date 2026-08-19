@@ -14,6 +14,8 @@ Theme :: struct {
 	panel_border_inactive: tui.Style,
 	panel_row_active:      tui.Style,
 	panel_row_inactive:    tui.Style,
+	marked_active:         tui.Style,
+	marked_inactive:       tui.Style,
 	selection_active:      tui.Style,
 	selection_inactive:    tui.Style,
 	status:                tui.Style,

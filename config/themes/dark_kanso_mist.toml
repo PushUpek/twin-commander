@@ -21,6 +21,14 @@ background = "#22262D"
 foreground = "#909398"
 background = "#22262D"
 
+[marked_active]
+foreground = "#22262D"
+background = "#7AA89F"
+
+[marked_inactive]
+foreground = "#C5C9C7"
+background = "#3D5552"
+
 [selection_active]
 foreground = "#C5C9C7"
 background = "#43464E"
