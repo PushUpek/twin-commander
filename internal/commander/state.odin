@@ -5,6 +5,7 @@ import "core:os"
 Panel_State :: struct {
 	path:     string,
 	files:    []os.File_Info,
+	marked:   [dynamic]string,
 	selected: int,
 	offset:   int,
 }
@@ -22,6 +23,7 @@ App_State :: struct {
 	copying:           bool,
 	copy_name:         string,
 	pending_name:      string,
+	pending_count:     int,
 	copy_percent:      int,
 }
 
