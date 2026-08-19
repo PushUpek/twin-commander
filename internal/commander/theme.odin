@@ -1,92 +1,66 @@
 package commander
 
-import "tc:internal/tui"
+import "base:runtime"
+import "core:os"
+import "core:strings"
+import themes "./themes"
 
-Theme_Mode :: enum {
-	Dark,
-	Light,
-}
+Theme_Mode :: themes.Mode
+Theme :: themes.Theme
 
-Theme :: struct {
-	screen:                tui.Style,
-	panel_border_active:   tui.Style,
-	panel_border_inactive: tui.Style,
-	panel_row_active:      tui.Style,
-	panel_row_inactive:    tui.Style,
-	selection_active:      tui.Style,
-	selection_inactive:    tui.Style,
-	status:                tui.Style,
-	keys:                  tui.Style,
-	dialog_surface:        tui.Style,
-	dialog_border:         tui.Style,
-	dialog_accent:         tui.Style,
-	dialog_action:         tui.Style,
-	progress_track:        tui.Style,
-	progress_fill:         tui.Style,
+load_theme :: proc(mode: Theme_Mode, allocator: runtime.Allocator) -> (Theme, bool) {
+	switch mode {
+	case .Light:
+		return themes.light_kanso_pearl(allocator)
+	case .Dark:
+		return themes.dark_kanso_mist(allocator)
+	}
+	return {}, false
 }
 
 theme_for :: proc(mode: Theme_Mode) -> Theme {
-	switch mode {
-	case .Light:
-		return Theme {
-			screen = {foreground = .Black, background = .White},
-			panel_border_active = {foreground = .Blue, background = .White, attributes = {.Bold}},
-			panel_border_inactive = {
-				foreground = .Black,
-				background = .White,
-				attributes = {.Dim},
-			},
-			panel_row_active = {foreground = .Black, background = .White},
-			panel_row_inactive = {foreground = .Black, background = .White, attributes = {.Dim}},
-			selection_active = {foreground = .White, background = .Blue, attributes = {.Bold}},
-			selection_inactive = {
-				foreground = .Blue,
-				background = .White,
-				attributes = {.Underline},
-			},
-			status = {foreground = .White, background = .Blue},
-			keys = {foreground = .White, background = .Black},
-			dialog_surface = {foreground = .White, background = .Black},
-			dialog_border = {foreground = .White, background = .Black, attributes = {.Bold}},
-			dialog_accent = {
-				foreground = .White,
-				background = .Black,
-				attributes = {.Bold, .Underline},
-			},
-			dialog_action = {foreground = .Black, background = .White, attributes = {.Bold}},
-			progress_track = {background = .White},
-			progress_fill = {background = .Cyan},
+	theme, ok := load_theme(mode, context.allocator)
+	assert(ok, "Nie można wczytać motywu z config/themes")
+	return theme
+}
+
+destroy_theme :: proc(theme: ^Theme) {
+	themes.theme_destroy(theme)
+}
+
+system_theme_mode :: proc() -> (Theme_Mode, bool) {
+	when ODIN_OS == .Darwin {
+		state, stdout, stderr, err := os.process_exec(
+			os.Process_Desc{command = []string{"/usr/bin/defaults", "read", "-g", "AppleInterfaceStyle"}},
+			context.temp_allocator,
+		)
+		_ = stderr
+		if err != nil {
+			return {}, false
 		}
-	case .Dark:
-		return Theme {
-			screen = {foreground = .White, background = .Black},
-			panel_border_active = {foreground = .Cyan, background = .Black, attributes = {.Bold}},
-			panel_border_inactive = {
-				foreground = .White,
-				background = .Black,
-				attributes = {.Dim},
-			},
-			panel_row_active = {foreground = .White, background = .Black},
-			panel_row_inactive = {foreground = .White, background = .Black, attributes = {.Dim}},
-			selection_active = {foreground = .Black, background = .Cyan, attributes = {.Bold}},
-			selection_inactive = {
-				foreground = .Cyan,
-				background = .Black,
-				attributes = {.Underline},
-			},
-			status = {foreground = .Black, background = .Cyan},
-			keys = {foreground = .Black, background = .White},
-			dialog_surface = {foreground = .Black, background = .White},
-			dialog_border = {foreground = .Black, background = .White, attributes = {.Bold}},
-			dialog_accent = {
-				foreground = .Black,
-				background = .White,
-				attributes = {.Bold, .Underline},
-			},
-			dialog_action = {foreground = .White, background = .Black, attributes = {.Bold}},
-			progress_track = {background = .Black},
-			progress_fill = {background = .Cyan},
-		}
+		return theme_mode_from_apple_style(string(stdout), state.success)
 	}
-	return {}
+	return {}, false
+}
+
+theme_mode_from_apple_style :: proc(value: string, key_exists: bool) -> (Theme_Mode, bool) {
+	if !key_exists {
+		// macOS nie zapisuje klucza AppleInterfaceStyle dla trybu jasnego.
+		return .Light, true
+	}
+	if strings.contains(value, "Dark") {
+		return .Dark, true
+	}
+	return {}, false
+}
+
+theme_mode_override :: proc() -> (Theme_Mode, bool) {
+	value := os.get_env("TWIN_COMMANDER_THEME", context.temp_allocator)
+	switch value {
+	case "light", "LIGHT", "Light":
+		return .Light, true
+	case "dark", "DARK", "Dark":
+		return .Dark, true
+	}
+	return {}, false
 }

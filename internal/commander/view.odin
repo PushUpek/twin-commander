@@ -6,7 +6,7 @@ import "tc:internal/tui"
 draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	buffer := tui.begin_frame(ctx)
 	width, height := tui.size(ctx)
-	theme := theme_for(app.theme_mode)
+	theme := app.theme
 	tui.buffer_fill(
 		buffer,
 		tui.Rect{x = 0, y = 0, width = width, height = height},
@@ -52,6 +52,9 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	} else {
 		tui.buffer_write(buffer, 1, height - 2, app.status, theme.status, width - 2)
 	}
+	theme_label := theme.name
+	theme_label_x := max(width - len(theme_label) - 1, 1)
+	tui.buffer_write(buffer, theme_label_x, height - 2, theme_label, theme.status, width - theme_label_x)
 
 	tui.buffer_fill(
 		buffer,

@@ -22,8 +22,16 @@ osc_11_classifies_dark_and_light_backgrounds :: proc(t: ^testing.T) {
 
 @(test)
 color_scheme_preference_reports_are_parsed :: proc(t: ^testing.T) {
+	unknown := session_with_pending("\e[?997;0n")
+	event, ok := parse_pending(&unknown)
+	testing.expect(t, ok)
+	testing.expect_value(t, event.kind, Event_Kind.Appearance)
+	testing.expect_value(t, event.appearance, Appearance.Unknown)
+	testing.expect_value(t, event.appearance_source, Appearance_Source.Preference)
+	testing.expect_value(t, unknown.pending_count, 0)
+
 	dark := session_with_pending("\e[?997;1n")
-	event, ok := parse_pending(&dark)
+	event, ok = parse_pending(&dark)
 	testing.expect(t, ok)
 	testing.expect_value(t, event.appearance, Appearance.Dark)
 	testing.expect_value(t, event.appearance_source, Appearance_Source.Preference)
