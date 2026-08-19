@@ -162,11 +162,13 @@ panel_renders_metadata_columns_below_header :: proc(t: ^testing.T) {
 	}
 	draw_panel(&buffer, tui.Rect{width = 40, height = 8}, &state, true, {})
 
-	testing.expect_value(t, tui.buffer_get(&buffer, 2, 1).character, rune('N'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 4, 1).character, rune('N'))
 	testing.expect_value(t, tui.buffer_get(&buffer, 19, 1).character, rune('R'))
 	testing.expect_value(t, tui.buffer_get(&buffer, 27, 1).character, rune('U'))
-	testing.expect_value(t, tui.buffer_get(&buffer, 2, 2).character, rune('.'))
-	testing.expect_value(t, tui.buffer_get(&buffer, 2, 3).character, rune('n'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 2, 2).character, rune('↰'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 4, 2).character, rune('.'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 2, 3).character, rune('≡'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 4, 3).character, rune('n'))
 	testing.expect_value(t, tui.buffer_get(&buffer, 22, 3).character, rune('1'))
 	testing.expect_value(t, tui.buffer_get(&buffer, 29, 3).character, rune('r'))
 }
@@ -183,7 +185,28 @@ marked_panel_entry_changes_the_whole_row_color_without_prefix :: proc(t: ^testin
 	append(&state.marked, "note.txt")
 	defer delete(state.marked)
 	draw_panel(&buffer, tui.Rect{width = 40, height = 8}, &state, true, theme)
-	testing.expect_value(t, tui.buffer_get(&buffer, 2, 3).character, rune('n'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 2, 3).character, rune('≡'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 4, 3).character, rune('n'))
 	testing.expect_value(t, tui.buffer_get(&buffer, 2, 3).style.background_rgb, theme.marked_active.background_rgb)
 	testing.expect_value(t, tui.buffer_get(&buffer, 38, 3).style.background_rgb, theme.marked_active.background_rgb)
+}
+
+@(test)
+file_type_icons_cover_directories_and_common_file_categories :: proc(t: ^testing.T) {
+	test_cases := []struct {
+		file:     os.File_Info,
+		expected: rune,
+	}{
+		{{name = "documents", type = .Directory}, '▸'},
+		{{name = "main.ODIN", type = .Regular}, 'λ'},
+		{{name = "photo.png", type = .Regular}, '◈'},
+		{{name = "backup.tar.gz", type = .Regular}, '▣'},
+		{{name = "notes.md", type = .Regular}, '≡'},
+		{{name = "unknown.bin", type = .Regular}, '·'},
+		{{name = "shortcut", type = .Symlink}, '↗'},
+	}
+
+	for test_case in test_cases {
+		testing.expect_value(t, file_type_icon(test_case.file), test_case.expected)
+	}
 }
