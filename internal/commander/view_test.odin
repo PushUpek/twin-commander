@@ -34,6 +34,21 @@ overwrite_dialog_is_centered_and_contains_actions :: proc(t: ^testing.T) {
 }
 
 @(test)
+move_edit_dialog_shows_the_editable_target_name :: proc(t: ^testing.T) {
+	buffer: tui.Buffer
+	tui.buffer_init(&buffer, 80, 24)
+	defer tui.buffer_destroy(&buffer)
+
+	theme := theme_for(.Dark)
+	defer destroy_theme(&theme)
+	draw_move_edit_dialog(&buffer, 80, 24, "raport.txt", len("raport.txt"), theme)
+
+	testing.expect_value(t, tui.buffer_get(&buffer, 13, 11).character, rune('r'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 23, 11).style.background_rgb, theme.dialog_action.background_rgb)
+	testing.expect_value(t, tui.buffer_get(&buffer, 14, 14).character, rune('E'))
+}
+
+@(test)
 copy_progress_dialog_fills_bar_proportionally :: proc(t: ^testing.T) {
 	buffer: tui.Buffer
 	tui.buffer_init(&buffer, 80, 24)
