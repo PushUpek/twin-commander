@@ -54,7 +54,14 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	}
 	theme_label := theme.name
 	theme_label_x := max(width - len(theme_label) - 1, 1)
-	tui.buffer_write(buffer, theme_label_x, height - 2, theme_label, theme.status, width - theme_label_x)
+	tui.buffer_write(
+		buffer,
+		theme_label_x,
+		height - 2,
+		theme_label,
+		theme.status,
+		width - theme_label_x,
+	)
 
 	tui.buffer_fill(
 		buffer,
@@ -65,16 +72,44 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		buffer,
 		0,
 		height - 1,
-		"Tab Panel  Enter Otwórz  ↑/↓ Wybór  F5 Kopiuj  Esc Koniec",
+		"Tab Panel  Enter Otwórz  ↑/↓ Wybór  F5 Kopiuj  F6 Przenieś  F8 Usuń  Esc Koniec",
 		theme.keys,
 		width,
 	)
 
 	if app.overwrite_pending {
 		draw_overwrite_dialog(buffer, width, height, app.copy_name, theme)
+	} else if app.move_pending {
+		draw_move_overwrite_dialog(buffer, width, height, app.pending_name, theme)
+	} else if app.delete_pending {
+		draw_delete_dialog(buffer, width, height, app.pending_name, theme)
 	} else if app.copying {
 		draw_copy_progress_dialog(buffer, width, height, app.copy_name, app.copy_percent, theme)
 	}
+}
+
+draw_move_overwrite_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	entry_name: string,
+	theme: Theme,
+) {
+	dialog := dialog_open(buffer, width, height, 7, "Potwierdzenie przeniesienia", theme)
+	dialog_write(dialog, 2, "Element docelowy już istnieje:")
+	dialog_write(dialog, 3, entry_name, .Accent)
+	dialog_write(dialog, 5, " Enter/T Tak   Esc/N Nie   W Wszystkie ", .Action)
+}
+
+draw_delete_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	entry_name: string,
+	theme: Theme,
+) {
+	dialog := dialog_open(buffer, width, height, 7, "Potwierdzenie usunięcia", theme)
+	dialog_write(dialog, 2, "Czy na pewno usunąć?")
+	dialog_write(dialog, 3, entry_name, .Accent)
+	dialog_write(dialog, 5, " Enter/T Tak   Esc/N Nie   W Wszystkie ", .Action)
 }
 
 draw_overwrite_dialog :: proc(
@@ -84,9 +119,9 @@ draw_overwrite_dialog :: proc(
 	theme: Theme,
 ) {
 	dialog := dialog_open(buffer, width, height, 7, "Potwierdzenie", theme)
-	dialog_write(dialog, 2, "Plik docelowy już istnieje:")
+	dialog_write(dialog, 2, "Element docelowy już istnieje:")
 	dialog_write(dialog, 3, file_name, .Accent)
-	dialog_write(dialog, 5, " Enter/T Nadpisz    Esc/N Anuluj ", .Action)
+	dialog_write(dialog, 5, " Enter/T Tak   Esc/N Nie   W Wszystkie ", .Action)
 }
 
 draw_copy_progress_dialog :: proc(

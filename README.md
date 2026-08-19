@@ -23,12 +23,16 @@ Każdy panel wyświetla zawartość własnego katalogu. Obsługiwane klawisze:
 - `↑`/`↓` — zmiana zaznaczenia,
 - `Enter` — wejście do zaznaczonego katalogu (wpis `..` przechodzi wyżej),
 - `Tab` — przełączenie aktywnego panelu,
-- `F5` — skopiowanie zaznaczonego pliku do katalogu w drugim panelu,
+- `F5` — skopiowanie zaznaczonego pliku lub katalogu do katalogu w drugim panelu,
+- `F6` — przeniesienie zaznaczonego pliku lub katalogu do katalogu w drugim panelu,
+- `F8` — usunięcie zaznaczonego pliku lub katalogu (po potwierdzeniu),
 - `Esc` lub `Ctrl-C` — zakończenie programu.
 
-Podczas kopiowania pływające okno pokazuje procentowy postęp operacji. Jeśli plik
+Podczas kopiowania pływające okno pokazuje procentowy postęp operacji. Jeśli element
 o tej samej nazwie już istnieje w panelu docelowym, program najpierw poprosi o
-potwierdzenie jego nadpisania.
+potwierdzenie jego nadpisania. Popupy dla nadpisywania, przenoszenia i usuwania
+oferują decyzje `Tak`, `Nie` oraz `Wszystkie`; ostatnia dotyczy wyłącznie bieżącego
+zestawu operacji i nie wyłącza ostrzeżeń w przyszłości.
 
 Interfejs ma dwa odrębne szablony kolorystyczne: Kanso Pearl dla trybu jasnego
 i Kanso Mist dla trybu ciemnego. Ich definicje TOML znajdują się w
