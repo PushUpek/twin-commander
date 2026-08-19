@@ -111,11 +111,19 @@ open :: proc(session: ^Session) -> bool {
 		return false
 	}
 
+	session.pending_count = 0
 	session.active = true
 	session.size = terminal_size
 	write("\e[?1049h\e[?25l\e[2J\e[H\e[?2031h")
 	request_appearance(session)
 	return true
+}
+
+current_size :: proc(session: ^Session) -> (width, height: int) {
+	if session == nil {
+		return
+	}
+	return session.size.width, session.size.height
 }
 
 close :: proc(session: ^Session) {

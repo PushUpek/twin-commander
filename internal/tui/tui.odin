@@ -29,6 +29,23 @@ destroy :: proc(tui: ^Context) {
 	term.close(&tui.terminal)
 }
 
+suspend :: proc(tui: ^Context) {
+	if tui == nil {
+		return
+	}
+	term.close(&tui.terminal)
+}
+
+resume :: proc(tui: ^Context) -> bool {
+	if tui == nil || !term.open(&tui.terminal) {
+		return false
+	}
+	width, height := term.current_size(&tui.terminal)
+	screen_resize(&tui.screen, width, height)
+	tui.screen.force_redraw = true
+	return true
+}
+
 size :: proc(tui: ^Context) -> (width, height: int) {
 	return tui.screen.back.width, tui.screen.back.height
 }

@@ -104,6 +104,10 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			panel_move_selection(&app.panels[app.active_panel], 1)
 		case .Enter:
 			enter_selected_directory(app)
+		case .F3:
+			open_selected_file(ctx, app, .View, running)
+		case .F4:
+			open_selected_file(ctx, app, .Edit, running)
 		case .F5:
 			copy_selected_file(ctx, app)
 		case .F6:
