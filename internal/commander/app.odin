@@ -4,18 +4,30 @@ import "core:fmt"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
+import "core:time"
 import "tc:internal/tui"
 
 Run :: proc() {
+	app: App_State
+	defer app_destroy(&app)
+	if mode, ok := theme_mode_override(); ok {
+		app.theme_mode = mode
+		app.theme_overridden = true
+	} else if mode, ok := system_theme_mode(); ok {
+		app.theme_mode = mode
+	}
+	if !set_theme_mode(&app, app.theme_mode) {
+		fmt.eprintln("Nie można wczytać motywu z katalogu config/themes")
+		return
+	}
+	last_system_theme_check := time.tick_now()
+
 	ui_context: tui.Context
 	if !tui.init(&ui_context) {
 		fmt.eprintln("Twin Commander wymaga interaktywnego terminala POSIX")
 		return
 	}
 	defer tui.destroy(&ui_context)
-
-	app: App_State
-	defer app_destroy(&app)
 
 	cwd, cwd_err := os.getwd(context.allocator)
 	if cwd_err != nil {
@@ -41,6 +53,12 @@ Run :: proc() {
 
 	running := true
 	for running {
+		if !app.theme_overridden && time.tick_since(last_system_theme_check) >= 2 * time.Second {
+			if mode, ok := system_theme_mode(); ok {
+				set_theme_mode(&app, mode)
+			}
+			last_system_theme_check = time.tick_now()
+		}
 		draw(&ui_context, &app)
 		if !tui.present(&ui_context) {
 			break
@@ -56,11 +74,7 @@ Run :: proc() {
 
 handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, running: ^bool) {
 	if event.kind == .Appearance {
-		if event.appearance == .Light {
-			app.theme_mode = .Light
-		} else if event.appearance == .Dark {
-			app.theme_mode = .Dark
-		}
+		apply_appearance(app, event.appearance)
 		return
 	}
 
@@ -90,6 +104,35 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			running^ = false
 		}
 	}
+}
+
+apply_appearance :: proc(app: ^App_State, appearance: tui.Appearance) {
+	if app == nil || app.theme_overridden {
+		return
+	}
+	#partial switch appearance {
+	case .Light:
+		set_theme_mode(app, .Light)
+	case .Dark:
+		set_theme_mode(app, .Dark)
+	}
+}
+
+set_theme_mode :: proc(app: ^App_State, mode: Theme_Mode) -> bool {
+	if app == nil {
+		return false
+	}
+	if app.theme_mode == mode && len(app.theme.name) > 0 {
+		return true
+	}
+	theme, ok := load_theme(mode, context.allocator)
+	if !ok {
+		return false
+	}
+	destroy_theme(&app.theme)
+	app.theme = theme
+	app.theme_mode = mode
+	return true
 }
 
 enter_selected_directory :: proc(app: ^App_State) {

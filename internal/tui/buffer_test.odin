@@ -24,3 +24,12 @@ buffer_clips_rectangles :: proc(t: ^testing.T) {
 }
 
 import "core:testing"
+
+@(test)
+rgb_color_preserves_all_channels :: proc(t: ^testing.T) {
+	color := rgb(0x4d699b)
+	testing.expect(t, color.valid)
+	testing.expect_value(t, color.r, u8(0x4d))
+	testing.expect_value(t, color.g, u8(0x69))
+	testing.expect_value(t, color.b, u8(0x9b))
+}

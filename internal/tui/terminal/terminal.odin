@@ -169,6 +169,9 @@ poll_event :: proc(session: ^Session, timeout_ms: int) -> (Event, bool) {
 
 	event, ok := parse_pending(session)
 	if ok && event.kind == .Appearance {
+		if event.appearance == .Unknown {
+			return {}, false
+		}
 		if event.appearance_source == .Preference {
 			session.preference_supported = true
 		} else if session.preference_supported {

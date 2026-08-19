@@ -13,6 +13,8 @@ App_State :: struct {
 	panels:            [2]Panel_State,
 	active_panel:      int,
 	theme_mode:        Theme_Mode,
+	theme:             Theme,
+	theme_overridden:  bool,
 	status:            string,
 	overwrite_pending: bool,
 	copying:           bool,
@@ -24,6 +26,7 @@ app_destroy :: proc(app: ^App_State) {
 	for index in 0 ..< len(app.panels) {
 		panel_destroy(&app.panels[index])
 	}
+	destroy_theme(&app.theme)
 	delete(app.status)
 }
 

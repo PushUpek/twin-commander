@@ -1,0 +1,66 @@
+name = "Kanso Mist"
+
+[screen]
+foreground = "#C5C9C7"
+background = "#22262D"
+
+[panel_border_active]
+foreground = "#7FB4CA"
+background = "#22262D"
+bold = true
+
+[panel_border_inactive]
+foreground = "#909398"
+background = "#22262D"
+
+[panel_row_active]
+foreground = "#C5C9C7"
+background = "#22262D"
+
+[panel_row_inactive]
+foreground = "#909398"
+background = "#22262D"
+
+[selection_active]
+foreground = "#C5C9C7"
+background = "#43464E"
+bold = true
+
+[selection_inactive]
+foreground = "#7FB4CA"
+background = "#22262D"
+underline = true
+
+[status]
+foreground = "#22262D"
+background = "#8EA4A2"
+
+[keys]
+foreground = "#C5C9C7"
+background = "#43464E"
+
+[dialog_surface]
+foreground = "#C5C9C7"
+background = "#2A2C35"
+
+[dialog_border]
+foreground = "#7FB4CA"
+background = "#2A2C35"
+bold = true
+
+[dialog_accent]
+foreground = "#8EA4A2"
+background = "#2A2C35"
+bold = true
+underline = true
+
+[dialog_action]
+foreground = "#22262D"
+background = "#7FB4CA"
+bold = true
+
+[progress_track]
+background = "#43464E"
+
+[progress_fill]
+background = "#7AA89F"

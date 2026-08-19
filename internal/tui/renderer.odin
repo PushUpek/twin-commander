@@ -86,7 +86,27 @@ write_style :: proc(output: ^strings.Builder, style: Style) {
 	if .Dim in style.attributes do strings.write_string(output, ";2")
 	if .Underline in style.attributes do strings.write_string(output, ";4")
 	if .Reverse in style.attributes do strings.write_string(output, ";7")
-	if style.foreground != .Default do fmt.sbprintf(output, ";%d", 29 + int(style.foreground))
-	if style.background != .Default do fmt.sbprintf(output, ";%d", 39 + int(style.background))
+	if style.foreground_rgb.valid {
+		fmt.sbprintf(
+			output,
+			";38;2;%d;%d;%d",
+			style.foreground_rgb.r,
+			style.foreground_rgb.g,
+			style.foreground_rgb.b,
+		)
+	} else if style.foreground != .Default {
+		fmt.sbprintf(output, ";%d", 29 + int(style.foreground))
+	}
+	if style.background_rgb.valid {
+		fmt.sbprintf(
+			output,
+			";48;2;%d;%d;%d",
+			style.background_rgb.r,
+			style.background_rgb.g,
+			style.background_rgb.b,
+		)
+	} else if style.background != .Default {
+		fmt.sbprintf(output, ";%d", 39 + int(style.background))
+	}
 	strings.write_string(output, "m")
 }
