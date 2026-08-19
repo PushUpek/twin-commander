@@ -1,7 +1,13 @@
 package commander
 
 import "core:fmt"
+import "core:os"
 import "tc:internal/tui"
+
+PANEL_SIZE_WIDTH :: 7
+PANEL_PERMISSIONS_WIDTH :: 11
+PANEL_COLUMN_GAP :: 1
+PANEL_MIN_NAME_WIDTH :: 5
 
 draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	buffer := tui.begin_frame(ctx)
@@ -170,7 +176,33 @@ draw_panel :: proc(
 		)
 	}
 
-	visible_rows := max(rect.height - 2, 0)
+	content_x := rect.x + 2
+	content_width := max(rect.width - 4, 0)
+	show_metadata :=
+		content_width >=
+		PANEL_MIN_NAME_WIDTH +
+			PANEL_COLUMN_GAP +
+			PANEL_SIZE_WIDTH +
+			PANEL_COLUMN_GAP +
+			PANEL_PERMISSIONS_WIDTH
+	rows_y := rect.y + 1
+	if show_metadata {
+		permissions_x := content_x + content_width - PANEL_PERMISSIONS_WIDTH
+		size_x := permissions_x - PANEL_COLUMN_GAP - PANEL_SIZE_WIDTH
+		tui.buffer_write(buffer, content_x, rows_y, "Nazwa", border_style, size_x - content_x)
+		tui.buffer_write(buffer, size_x, rows_y, "Rozmiar", border_style, PANEL_SIZE_WIDTH)
+		tui.buffer_write(
+			buffer,
+			permissions_x,
+			rows_y,
+			"Uprawnienia",
+			border_style,
+			PANEL_PERMISSIONS_WIDTH,
+		)
+		rows_y += 1
+	}
+
+	visible_rows := max(rect.y + rect.height - 1 - rows_y, 0)
 	if state.selected < state.offset {
 		state.offset = state.selected
 	} else if visible_rows > 0 && state.selected >= state.offset + visible_rows {
@@ -180,6 +212,7 @@ draw_panel :: proc(
 	item_count := panel_item_count(state)
 	for row in 0 ..< min(visible_rows, item_count - state.offset) {
 		index := state.offset + row
+		row_y := rows_y + row
 		row_style := theme.panel_row_inactive
 		if active {
 			row_style = theme.panel_row_active
@@ -191,12 +224,16 @@ draw_panel :: proc(
 		}
 		tui.buffer_fill(
 			buffer,
-			tui.Rect{x = rect.x + 1, y = rect.y + 1 + row, width = rect.width - 2, height = 1},
+			tui.Rect{x = rect.x + 1, y = row_y, width = rect.width - 2, height = 1},
 			tui.Cell{character = ' ', style = row_style},
 		)
 
 		name := ".."
 		name_buffer: [1024]byte
+		size := "-"
+		size_buffer: [16]byte
+		permissions := "-"
+		permissions_buffer: [9]byte
 		if index > 0 {
 			file := state.files[index - 1]
 			if file.type == .Directory {
@@ -204,8 +241,91 @@ draw_panel :: proc(
 			} else {
 				name = file.name
 			}
+			size = format_file_size(size_buffer[:], file.size)
+			permissions = format_permissions(permissions_buffer[:], file.mode)
 		}
-		tui.buffer_write(buffer, rect.x + 2, rect.y + 1 + row, name, row_style, rect.width - 4)
+
+		name_width := content_width
+		if show_metadata {
+			permissions_x := content_x + content_width - PANEL_PERMISSIONS_WIDTH
+			size_x := permissions_x - PANEL_COLUMN_GAP - PANEL_SIZE_WIDTH
+			name_width = size_x - PANEL_COLUMN_GAP - content_x
+			size_text_x := size_x + PANEL_SIZE_WIDTH - len(size)
+			permissions_text_x := permissions_x + PANEL_PERMISSIONS_WIDTH - len(permissions)
+			tui.buffer_write(buffer, size_text_x, row_y, size, row_style, PANEL_SIZE_WIDTH)
+			tui.buffer_write(
+				buffer,
+				permissions_text_x,
+				row_y,
+				permissions,
+				row_style,
+				PANEL_PERMISSIONS_WIDTH,
+			)
+		}
+		tui.buffer_write(buffer, content_x, row_y, name, row_style, name_width)
+	}
+}
+
+format_file_size :: proc(buffer: []byte, size: i64) -> string {
+	if size < 0 {
+		return "-"
+	}
+	if size < 1024 {
+		return fmt.bprintf(buffer, "%dB", size)
+	}
+
+	units := [?]string{"K", "M", "G", "T", "P", "E"}
+	unit_index := 0
+	divisor: i64 = 1024
+	for unit_index < len(units) - 1 && size >= divisor * 1024 {
+		divisor *= 1024
+		unit_index += 1
+	}
+
+	whole := size / divisor
+	if whole < 10 {
+		remainder := u128(size % divisor)
+		tenths := i64((remainder * 10 + u128(divisor) / 2) / u128(divisor))
+		if tenths == 10 {
+			whole += 1
+			tenths = 0
+		}
+		return fmt.bprintf(buffer, "%d.%d%s", whole, tenths, units[unit_index])
+	}
+
+	rounded := whole
+	if size % divisor >= (divisor + 1) / 2 {
+		rounded += 1
+	}
+	return fmt.bprintf(buffer, "%d%s", rounded, units[unit_index])
+}
+
+format_permissions :: proc(buffer: []byte, permissions: os.Permissions) -> string {
+	assert(len(buffer) >= 9)
+	for &character in buffer[:9] {
+		character = '-'
+	}
+	permission_character(buffer, 0, permissions, .Read_User, 'r')
+	permission_character(buffer, 1, permissions, .Write_User, 'w')
+	permission_character(buffer, 2, permissions, .Execute_User, 'x')
+	permission_character(buffer, 3, permissions, .Read_Group, 'r')
+	permission_character(buffer, 4, permissions, .Write_Group, 'w')
+	permission_character(buffer, 5, permissions, .Execute_Group, 'x')
+	permission_character(buffer, 6, permissions, .Read_Other, 'r')
+	permission_character(buffer, 7, permissions, .Write_Other, 'w')
+	permission_character(buffer, 8, permissions, .Execute_Other, 'x')
+	return string(buffer[:9])
+}
+
+permission_character :: proc(
+	buffer: []byte,
+	index: int,
+	permissions: os.Permissions,
+	permission: os.Permission_Flag,
+	character: byte,
+) {
+	if permission in permissions {
+		buffer[index] = character
 	}
 }
 

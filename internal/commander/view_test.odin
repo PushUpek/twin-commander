@@ -1,5 +1,6 @@
 package commander
 
+import "core:os"
 import "core:testing"
 import "tc:internal/tui"
 
@@ -107,4 +108,65 @@ system_appearance_selects_the_matching_theme :: proc(t: ^testing.T) {
 	app.theme_overridden = true
 	apply_appearance(&app, .Light)
 	testing.expect_value(t, app.theme_mode, Theme_Mode.Dark)
+}
+
+@(test)
+human_readable_file_sizes :: proc(t: ^testing.T) {
+	test_cases := []struct {
+		size:     i64,
+		expected: string,
+	} {
+		{0, "0B"},
+		{1023, "1023B"},
+		{1024, "1.0K"},
+		{1536, "1.5K"},
+		{10 * 1024, "10K"},
+		{1024 * 1024, "1.0M"},
+		{5 * 1024 * 1024 * 1024, "5.0G"},
+	}
+
+	for test_case in test_cases {
+		buffer: [16]byte
+		actual := format_file_size(buffer[:], test_case.size)
+		testing.expect_value(t, actual, test_case.expected)
+	}
+}
+
+@(test)
+symbolic_file_permissions :: proc(t: ^testing.T) {
+	test_cases := []struct {
+		permissions: os.Permissions,
+		expected:    string,
+	}{{os.perm(0o755), "rwxr-xr-x"}, {os.perm(0o644), "rw-r--r--"}, {os.perm(0), "---------"}}
+
+	for test_case in test_cases {
+		buffer: [9]byte
+		actual := format_permissions(buffer[:], test_case.permissions)
+		testing.expect_value(t, actual, test_case.expected)
+	}
+}
+
+@(test)
+panel_renders_metadata_columns_below_header :: proc(t: ^testing.T) {
+	buffer: tui.Buffer
+	tui.buffer_init(&buffer, 40, 8)
+	defer tui.buffer_destroy(&buffer)
+
+	files := []os.File_Info {
+		{name = "note.txt", size = 1536, mode = os.perm(0o640), type = .Regular},
+	}
+	state := Panel_State {
+		path     = "/tmp",
+		files    = files,
+		selected = 1,
+	}
+	draw_panel(&buffer, tui.Rect{width = 40, height = 8}, &state, true, {})
+
+	testing.expect_value(t, tui.buffer_get(&buffer, 2, 1).character, rune('N'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 19, 1).character, rune('R'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 27, 1).character, rune('U'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 2, 2).character, rune('.'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 2, 3).character, rune('n'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 22, 3).character, rune('1'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 29, 3).character, rune('r'))
 }
