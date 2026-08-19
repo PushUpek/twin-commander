@@ -13,8 +13,8 @@ Run :: proc() {
 	if mode, ok := theme_mode_override(); ok {
 		app.theme_mode = mode
 		app.theme_overridden = true
-	} else if mode, ok := system_theme_mode(); ok {
-		app.theme_mode = mode
+	} else if system_mode, system_ok := system_theme_mode(); system_ok {
+		app.theme_mode = system_mode
 	}
 	if !set_theme_mode(&app, app.theme_mode) {
 		fmt.eprintln("Nie można wczytać motywu z katalogu config/themes")
@@ -82,6 +82,14 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		handle_overwrite_event(ctx, app, event)
 		return
 	}
+	if app.move_pending {
+		handle_move_overwrite_event(app, event)
+		return
+	}
+	if app.delete_pending {
+		handle_delete_event(app, event)
+		return
+	}
 
 	#partial switch event.kind {
 	case .Key:
@@ -98,6 +106,10 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			enter_selected_directory(app)
 		case .F5:
 			copy_selected_file(ctx, app)
+		case .F6:
+			move_selected_entry(app)
+		case .F8:
+			delete_selected_entry(app)
 		}
 	case .Text:
 		if .Control in event.modifiers && event.text == 'c' {

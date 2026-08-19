@@ -38,40 +38,38 @@ copy_selected_file :: proc(ctx: ^tui.Context, app: ^App_State) {
 		return
 	}
 
-	perform_copy(ctx, app)
+	perform_copy(ctx, app, false)
 }
 
 handle_overwrite_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event) {
-	confirm := event.kind == .Key && event.key == .Enter
-	cancel := event.kind == .Key && event.key == .Escape
-	if event.kind == .Text {
-		confirm = event.text == 't' || event.text == 'T'
-		cancel = event.text == 'n' || event.text == 'N'
-	}
-	if !confirm && !cancel {
+	choice := confirmation_choice(event)
+	if choice == .None {
 		return
 	}
 
 	app.overwrite_pending = false
 	app.copy_name = ""
-	if cancel {
+	if choice == .No {
 		set_status(app, strings.clone("Anulowano kopiowanie") or_else "")
 		return
 	}
-	perform_copy(ctx, app)
+	perform_copy(ctx, app, true)
 }
 
 selected_copy :: proc(app: ^App_State) -> (os.File_Info, string, bool) {
 	source_panel := &app.panels[app.active_panel]
 	destination_panel := &app.panels[1 - app.active_panel]
 	if source_panel.selected == 0 {
-		set_status(app, strings.clone("Wybierz plik do skopiowania") or_else "")
+		set_status(app, strings.clone("Wybierz plik lub katalog do skopiowania") or_else "")
 		return {}, "", false
 	}
 
 	file := source_panel.files[source_panel.selected - 1]
-	if file.type != .Regular {
-		set_status(app, fmt.aprintf("F5 kopiuje pliki; %s nie jest zwykłym plikiem", file.name))
+	if file.type != .Regular && file.type != .Directory {
+		set_status(
+			app,
+			fmt.aprintf("F5 kopiuje pliki i katalogi; %s ma nieobsługiwany typ", file.name),
+		)
 		return {}, "", false
 	}
 
@@ -81,13 +79,20 @@ selected_copy :: proc(app: ^App_State) -> (os.File_Info, string, bool) {
 		return {}, destination_path, false
 	}
 	if file.fullpath == destination_path {
-		set_status(app, strings.clone("Źródło i cel są tym samym plikiem") or_else "")
+		set_status(app, strings.clone("Źródło i cel są tym samym elementem") or_else "")
+		return {}, destination_path, false
+	}
+	if file.type == .Directory && path_is_inside(destination_panel.path, file.fullpath) {
+		set_status(
+			app,
+			strings.clone("Nie można skopiować katalogu do jego wnętrza") or_else "",
+		)
 		return {}, destination_path, false
 	}
 	return file, destination_path, true
 }
 
-perform_copy :: proc(ctx: ^tui.Context, app: ^App_State) {
+perform_copy :: proc(ctx: ^tui.Context, app: ^App_State, replace: bool) {
 	file, destination_path, ok := selected_copy(app)
 	defer delete(destination_path)
 	if !ok {
@@ -107,11 +112,10 @@ perform_copy :: proc(ctx: ^tui.Context, app: ^App_State) {
 		progress_proc = on_copy_progress
 		progress_data = rawptr(&progress_context)
 	}
-	copy_err := fsops.Copy_File(
+	copy_err := fsops.Copy_Entry(
 		file.fullpath,
 		destination_path,
-		file.size,
-		file.mode,
+		replace,
 		progress_proc,
 		progress_data,
 	)

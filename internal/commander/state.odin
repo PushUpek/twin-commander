@@ -17,8 +17,11 @@ App_State :: struct {
 	theme_overridden:  bool,
 	status:            string,
 	overwrite_pending: bool,
+	move_pending:      bool,
+	delete_pending:    bool,
 	copying:           bool,
 	copy_name:         string,
+	pending_name:      string,
 	copy_percent:      int,
 }
 
