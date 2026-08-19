@@ -1,0 +1,66 @@
+name = "Kanso Pearl"
+
+[screen]
+foreground = "#22262D"
+background = "#F2F1EF"
+
+[panel_border_active]
+foreground = "#4D699B"
+background = "#F2F1EF"
+bold = true
+
+[panel_border_inactive]
+foreground = "#6D6D69"
+background = "#F2F1EF"
+
+[panel_row_active]
+foreground = "#22262D"
+background = "#F2F1EF"
+
+[panel_row_inactive]
+foreground = "#6D6D69"
+background = "#F2F1EF"
+
+[selection_active]
+foreground = "#22262D"
+background = "#C7D7E0"
+bold = true
+
+[selection_inactive]
+foreground = "#4D699B"
+background = "#F2F1EF"
+underline = true
+
+[status]
+foreground = "#F2F1EF"
+background = "#4D699B"
+
+[keys]
+foreground = "#F2F1EF"
+background = "#22262D"
+
+[dialog_surface]
+foreground = "#22262D"
+background = "#E2E1DF"
+
+[dialog_border]
+foreground = "#4D699B"
+background = "#E2E1DF"
+bold = true
+
+[dialog_accent]
+foreground = "#624C83"
+background = "#E2E1DF"
+bold = true
+underline = true
+
+[dialog_action]
+foreground = "#F2F1EF"
+background = "#4D699B"
+bold = true
+
+[progress_track]
+background = "#DDDDDB"
+
+[progress_fill]
+background = "#597B75"

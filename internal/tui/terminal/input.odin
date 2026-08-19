@@ -87,7 +87,11 @@ parse_appearance_report :: proc(data: []u8) -> (Event, int, bool, bool) {
 	reports := []struct {
 		sequence:   string,
 		appearance: Appearance,
-	}{{"\e[?997;1n", .Dark}, {"\e[?997;2n", .Light}}
+	} {
+		{"\e[?997;0n", .Unknown},
+		{"\e[?997;1n", .Dark},
+		{"\e[?997;2n", .Light},
+	}
 	for report in reports {
 		sequence := transmute([]u8)report.sequence
 		prefix_width := min(len(data), len(sequence))
