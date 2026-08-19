@@ -24,10 +24,17 @@ Każdy panel wyświetla zawartość własnego katalogu. Obsługiwane klawisze:
 - `Enter` — wejście do zaznaczonego katalogu (wpis `..` przechodzi wyżej),
 - `Tab` — przełączenie aktywnego panelu,
 - `Spacja` — oznaczenie lub odznaczenie elementu i przejście do następnego wiersza,
+- `F3` — otwarcie zaznaczonego pliku tylko do odczytu w zewnętrznym pagerze (`$PAGER`, domyślnie `less`),
+- `F4` — otwarcie zaznaczonego pliku w zewnętrznym edytorze (`$VISUAL`, następnie `$EDITOR`, domyślnie `vi`),
 - `F5` — skopiowanie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu,
 - `F6` — przeniesienie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu,
 - `F8` — usunięcie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) po potwierdzeniu,
 - `Esc` lub `Ctrl-C` — zakończenie programu.
+
+Na czas podglądu lub edycji Twin Commander oddaje zewnętrznemu programowi zwykły
+terminal. Po zamknięciu programu wraca do interfejsu i po edycji odświeża aktywny
+panel. Zmienne `PAGER`, `VISUAL` i `EDITOR` mogą zawierać również argumenty, np.
+`EDITOR="code --wait"`.
 
 Podczas kopiowania pływające okno pokazuje procentowy postęp operacji. Jeśli element
 o tej samej nazwie już istnieje w panelu docelowym, program najpierw poprosi o

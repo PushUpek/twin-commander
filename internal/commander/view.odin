@@ -78,7 +78,7 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		buffer,
 		0,
 		height - 1,
-		"Spacja Oznacz  Tab Panel  Enter Otwórz  F5 Kopiuj  F6 Przenieś  F8 Usuń  Esc Koniec",
+		"F3 Podgląd  F4 Edycja  F5 Kopiuj  F6 Przenieś  F8 Usuń  Tab Panel  Esc Koniec",
 		theme.keys,
 		width,
 	)
