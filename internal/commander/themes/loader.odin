@@ -102,6 +102,10 @@ style_for_section :: proc(theme: ^Theme, section: string) -> (^tui.Style, bool) 
 		return &theme.panel_row_active, true
 	case "panel_row_inactive":
 		return &theme.panel_row_inactive, true
+	case "marked_active":
+		return &theme.marked_active, true
+	case "marked_inactive":
+		return &theme.marked_inactive, true
 	case "selection_active":
 		return &theme.selection_active, true
 	case "selection_inactive":
@@ -193,6 +197,8 @@ theme_is_complete :: proc(theme: ^Theme) -> bool {
 		&theme.panel_border_inactive,
 		&theme.panel_row_active,
 		&theme.panel_row_inactive,
+		&theme.marked_active,
+		&theme.marked_inactive,
 		&theme.selection_active,
 		&theme.selection_inactive,
 		&theme.status,

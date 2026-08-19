@@ -170,3 +170,20 @@ panel_renders_metadata_columns_below_header :: proc(t: ^testing.T) {
 	testing.expect_value(t, tui.buffer_get(&buffer, 22, 3).character, rune('1'))
 	testing.expect_value(t, tui.buffer_get(&buffer, 29, 3).character, rune('r'))
 }
+
+@(test)
+marked_panel_entry_changes_the_whole_row_color_without_prefix :: proc(t: ^testing.T) {
+	buffer: tui.Buffer
+	tui.buffer_init(&buffer, 40, 8)
+	defer tui.buffer_destroy(&buffer)
+	theme := theme_for(.Dark)
+	defer destroy_theme(&theme)
+	files := []os.File_Info {{name = "note.txt", type = .Regular}}
+	state := Panel_State{path = "/tmp", files = files, selected = 1}
+	append(&state.marked, "note.txt")
+	defer delete(state.marked)
+	draw_panel(&buffer, tui.Rect{width = 40, height = 8}, &state, true, theme)
+	testing.expect_value(t, tui.buffer_get(&buffer, 2, 3).character, rune('n'))
+	testing.expect_value(t, tui.buffer_get(&buffer, 2, 3).style.background_rgb, theme.marked_active.background_rgb)
+	testing.expect_value(t, tui.buffer_get(&buffer, 38, 3).style.background_rgb, theme.marked_active.background_rgb)
+}
