@@ -1,6 +1,12 @@
 package commander
 
 import "core:os"
+import "tc:internal/fsops"
+
+Mark_Mode :: enum {
+	Select,
+	Unselect,
+}
 
 Panel_State :: struct {
 	path:     string,
@@ -8,6 +14,13 @@ Panel_State :: struct {
 	marked:   [dynamic]string,
 	selected: int,
 	offset:   int,
+	show_hidden: bool,
+	sort_kind: fsops.Sort_Kind,
+	sort_reverse: bool,
+	filter: string,
+	history: [dynamic]string,
+	history_index: int,
+	quick_search: string,
 }
 
 App_State :: struct {
@@ -26,6 +39,13 @@ App_State :: struct {
 	move_edit_pending: bool,
 	move_pending:      bool,
 	delete_pending:    bool,
+	filter_edit_pending: bool,
+	filter_text: string,
+	filter_cursor: int,
+	mark_edit_pending: bool,
+	mark_mode: Mark_Mode,
+	mark_pattern: string,
+	mark_pattern_cursor: int,
 	copying:           bool,
 	copy_name:         string,
 	copy_target_name:  string,
@@ -35,6 +55,7 @@ App_State :: struct {
 	pending_name:      string,
 	pending_count:     int,
 	copy_percent:      int,
+	operation_label:   string,
 }
 
 app_destroy :: proc(app: ^App_State) {
@@ -46,6 +67,9 @@ app_destroy :: proc(app: ^App_State) {
 	delete(app.copy_target_name)
 	delete(app.move_name)
 	delete(app.create_name)
+	delete(app.filter_text)
+	delete(app.mark_pattern)
+	delete(app.operation_label)
 }
 
 set_status :: proc(app: ^App_State, status: string) {

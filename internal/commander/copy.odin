@@ -10,6 +10,7 @@ import "tc:internal/tui"
 Copy_UI_Context :: struct {
 	tui: ^tui.Context,
 	app: ^App_State,
+	cancelled: bool,
 }
 
 copy_selected_file :: proc(ctx: ^tui.Context, app: ^App_State) {
@@ -57,7 +58,7 @@ prepare_copy :: proc(ctx: ^tui.Context, app: ^App_State, target_name: string) {
 			delete(destination_path)
 			return
 		}
-		destination_info, destination_err := os.stat(destination_path, context.allocator)
+		destination_info, destination_err := os.lstat(destination_path, context.allocator)
 		delete(destination_path)
 		if destination_err == nil {
 			os.file_info_delete(destination_info, context.allocator)
@@ -100,7 +101,7 @@ copy_entries :: proc(app: ^App_State) -> ([dynamic]os.File_Info, bool) {
 		return entries, false
 	}
 	for file in entries {
-		if file.type != .Regular && file.type != .Directory {
+		if file.type != .Regular && file.type != .Directory && file.type != .Symlink {
 			set_status(app, fmt.aprintf(tr("F5 kopiuje pliki i katalogi; %s ma nieobsługiwany typ"), file.name))
 			return entries, false
 		}
@@ -135,7 +136,11 @@ perform_copy :: proc(ctx: ^tui.Context, app: ^App_State, replace: bool, target_n
 	source_panel := &app.panels[app.active_panel]
 	destination_panel := &app.panels[1 - app.active_panel]
 	app.copying = true
+	delete(app.operation_label)
+	app.operation_label = strings.clone(tr("Kopiowanie")) or_else ""
 	progress_context := Copy_UI_Context{tui = ctx, app = app}
+	completed_count := 0
+	skipped_count := 0
 	for file, index in entries {
 		destination_path, path_ok := copy_destination(app, file, target_name)
 		if !path_ok {
@@ -152,12 +157,34 @@ perform_copy :: proc(ctx: ^tui.Context, app: ^App_State, replace: bool, target_n
 			progress_proc = on_copy_progress
 			progress_data = rawptr(&progress_context)
 		}
-		copy_err := fsops.Copy_Entry(file.fullpath, destination_path, replace, progress_proc, progress_data)
+		copy_err: os.Error
+		for {
+			progress_context.cancelled = false
+			copy_err = fsops.Copy_Entry(file.fullpath, destination_path, replace, progress_proc, progress_data)
+			if copy_err == nil {
+				completed_count += 1
+				break
+			}
+			if progress_context.cancelled {
+				break
+			}
+			choice := ask_operation_error(ctx, app, file.name, copy_err)
+			if choice == .Retry do continue
+			if choice == .Skip {
+				skipped_count += 1
+				copy_err = nil
+			}
+			break
+		}
 		delete(destination_path)
 		if copy_err != nil {
 			app.copying = false
 			app.copy_name = ""
 			panel_refresh(destination_panel)
+			if progress_context.cancelled {
+				set_status(app, fmt.aprintf(tr("Anulowano kopiowanie po %d z %d elementów"), completed_count, len(entries)))
+				return
+			}
 			set_status(app, fmt.aprintf(tr("Błąd kopiowania %s (%d/%d): %s"), file.name, index + 1, len(entries), os.error_string(copy_err)))
 			return
 		}
@@ -169,12 +196,21 @@ perform_copy :: proc(ctx: ^tui.Context, app: ^App_State, replace: bool, target_n
 		set_status(app, fmt.aprintf(tr("Skopiowano %d elementów, ale nie udało się odświeżyć panelu"), len(entries)))
 		return
 	}
-	set_status(app, fmt.aprintf(tr("Skopiowano %d elementów do %s"), len(entries), destination_panel.path))
+	if skipped_count > 0 {
+		set_status(app, fmt.aprintf(tr("Skopiowano %d, pominięto %d elementów"), completed_count, skipped_count))
+	} else {
+		set_status(app, fmt.aprintf(tr("Skopiowano %d elementów do %s"), completed_count, destination_panel.path))
+	}
 }
 
 on_copy_progress :: proc(percent: int, user_data: rawptr) -> bool {
 	progress_context := (^Copy_UI_Context)(user_data)
 	progress_context.app.copy_percent = percent
 	draw(progress_context.tui, progress_context.app)
-	return tui.present(progress_context.tui)
+	if !tui.present(progress_context.tui) do return false
+	if operation_cancel_requested(progress_context.tui) {
+		progress_context.cancelled = true
+		return false
+	}
+	return true
 }

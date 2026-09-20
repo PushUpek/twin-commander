@@ -54,6 +54,10 @@ begin_frame :: proc(tui: ^Context) -> ^Buffer {
 	return screen_begin(&tui.screen)
 }
 
+current_buffer :: proc(tui: ^Context) -> ^Buffer {
+	return &tui.screen.back
+}
+
 present :: proc(tui: ^Context) -> bool {
 	output := screen_render(&tui.screen)
 	defer strings.builder_destroy(&output)
