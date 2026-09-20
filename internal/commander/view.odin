@@ -22,7 +22,7 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		tui.Cell{character = ' ', style = theme.screen},
 	)
 	if width < 20 || height < 8 {
-		tui.buffer_write(buffer, 0, 0, "Terminal jest zbyt mały", theme.dialog_accent)
+		tui.buffer_write(buffer, 0, 0, tr("Terminal jest zbyt mały"), theme.dialog_accent)
 		return
 	}
 
@@ -53,7 +53,7 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		status_buffer: [512]byte
 		status := fmt.bprintf(
 			status_buffer[:],
-			"Kopiowanie %s: %d%%",
+			tr("Kopiowanie %s: %d%%"),
 			app.copy_name,
 			app.copy_percent,
 		)
@@ -81,12 +81,16 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		buffer,
 		0,
 		height - 1,
-		"F3 Podgląd  F4 Edycja  F5 Kopiuj jako  F6 Przenieś/Zmień nazwę  F8 Usuń  Tab Panel  Esc Koniec",
+		tr("F3/v Podgląd  F4/e Edycja  F5 Kopiuj jako  F6 Przenieś/Zmień nazwę  F7 Utwórz  F8 Usuń  Tab Panel  Esc Koniec"),
 		theme.keys,
 		width,
 	)
 
-	if app.overwrite_pending {
+	if app.create_edit_pending {
+		draw_name_edit_dialog(buffer, width, height, app.create_name, app.create_name_cursor,
+			tr("Utwórz plik / katalog"), tr("Enter Utwórz"), theme,
+			tr("Nazwa w aktywnym katalogu:"), tr("Ukośnik / = katalog (mkdir -p), bez / = plik"))
+	} else if app.overwrite_pending {
 		if app.pending_count > 1 {
 			draw_bulk_confirmation_dialog(buffer, width, height, app.copy_name, app.pending_count, .Copy, theme)
 		} else {
@@ -99,8 +103,8 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 			height,
 			app.copy_target_name,
 			app.copy_name_cursor,
-			"Kopiuj jako",
-			"Enter Kopiuj",
+			tr("Kopiuj jako"),
+			tr("Enter Kopiuj"),
 			theme,
 		)
 	} else if app.move_edit_pending {
@@ -135,8 +139,8 @@ draw_move_edit_dialog :: proc(
 		height,
 		entry_name,
 		cursor,
-		"Przenieś / zmień nazwę",
-		"Enter Przenieś",
+		tr("Przenieś / zmień nazwę"),
+		tr("Enter Przenieś"),
 		theme,
 	)
 }
@@ -148,9 +152,14 @@ draw_name_edit_dialog :: proc(
 	cursor: int,
 	title, submit_label: string,
 	theme: Theme,
+	prompt: string = "",
+	hint: string = "",
 ) {
 	dialog := dialog_open(buffer, width, height, 8, title, theme)
-	dialog_write(dialog, 2, "Nazwa w katalogu docelowym:")
+	label := prompt
+	if len(label) == 0 do label = tr("Nazwa w katalogu docelowym:")
+	dialog_write(dialog, 2, label)
+	dialog_write(dialog, 4, hint)
 	field := tui.Rect {
 		x = dialog.rect.x + 3,
 		y = dialog.rect.y + 3,
@@ -166,7 +175,7 @@ draw_name_edit_dialog :: proc(
 		cursor_cell.style = theme.dialog_action
 		tui.buffer_set(buffer, field.x + cursor_width, field.y, cursor_cell)
 	}
-	actions := fmt.aprintf(" %s   Esc Anuluj ", submit_label)
+	actions := fmt.aprintf(tr(" %s   Esc Anuluj "), submit_label)
 	defer delete(actions)
 	dialog_write(dialog, 6, actions, .Action)
 }
@@ -185,26 +194,26 @@ draw_bulk_confirmation_dialog :: proc(
 	kind: Bulk_Confirmation_Kind,
 	theme: Theme,
 ) {
-	title := "Potwierdzenie operacji"
-	question := "Wykonać operację na oznaczonych elementach?"
+	title := tr("Potwierdzenie operacji")
+	question := tr("Wykonać operację na oznaczonych elementach?")
 	#partial switch kind {
 	case .Copy:
-		title = "Potwierdzenie kopiowania"
-		question = "Cel już istnieje; nadpisać w całym zestawie?"
+		title = tr("Potwierdzenie kopiowania")
+		question = tr("Cel już istnieje; nadpisać w całym zestawie?")
 	case .Move:
-		title = "Potwierdzenie przeniesienia"
-		question = "Cel już istnieje; nadpisać w całym zestawie?"
+		title = tr("Potwierdzenie przeniesienia")
+		question = tr("Cel już istnieje; nadpisać w całym zestawie?")
 	case .Delete:
-		title = "Potwierdzenie usunięcia"
-		question = "Czy na pewno usunąć oznaczony zestaw?"
+		title = tr("Potwierdzenie usunięcia")
+		question = tr("Czy na pewno usunąć oznaczony zestaw?")
 	}
 	dialog := dialog_open(buffer, width, height, 8, title, theme)
 	dialog_write(dialog, 2, question)
 	count_buffer: [64]byte
-	count_text := fmt.bprintf(count_buffer[:], "Liczba elementów: %d", entry_count)
+	count_text := fmt.bprintf(count_buffer[:], tr("Liczba elementów: %d"), entry_count)
 	dialog_write(dialog, 3, count_text, .Accent)
 	dialog_write(dialog, 4, entry_name)
-	dialog_write(dialog, 6, " Enter/T Tak   Esc/N Nie ", .Action)
+	dialog_write(dialog, 6, tr(" Enter/T Tak   Esc/N Nie "), .Action)
 }
 
 draw_move_overwrite_dialog :: proc(
@@ -213,10 +222,10 @@ draw_move_overwrite_dialog :: proc(
 	entry_name: string,
 	theme: Theme,
 ) {
-	dialog := dialog_open(buffer, width, height, 7, "Potwierdzenie przeniesienia", theme)
-	dialog_write(dialog, 2, "Element docelowy już istnieje:")
+	dialog := dialog_open(buffer, width, height, 7, tr("Potwierdzenie przeniesienia"), theme)
+	dialog_write(dialog, 2, tr("Element docelowy już istnieje:"))
 	dialog_write(dialog, 3, entry_name, .Accent)
-	dialog_write(dialog, 5, " Enter/T Tak   Esc/N Nie   W Wszystkie ", .Action)
+	dialog_write(dialog, 5, tr(" Enter/T Tak   Esc/N Nie   W Wszystkie "), .Action)
 }
 
 draw_delete_dialog :: proc(
@@ -225,10 +234,10 @@ draw_delete_dialog :: proc(
 	entry_name: string,
 	theme: Theme,
 ) {
-	dialog := dialog_open(buffer, width, height, 7, "Potwierdzenie usunięcia", theme)
-	dialog_write(dialog, 2, "Czy na pewno usunąć?")
+	dialog := dialog_open(buffer, width, height, 7, tr("Potwierdzenie usunięcia"), theme)
+	dialog_write(dialog, 2, tr("Czy na pewno usunąć?"))
 	dialog_write(dialog, 3, entry_name, .Accent)
-	dialog_write(dialog, 5, " Enter/T Tak   Esc/N Nie   W Wszystkie ", .Action)
+	dialog_write(dialog, 5, tr(" Enter/T Tak   Esc/N Nie   W Wszystkie "), .Action)
 }
 
 draw_overwrite_dialog :: proc(
@@ -237,10 +246,10 @@ draw_overwrite_dialog :: proc(
 	file_name: string,
 	theme: Theme,
 ) {
-	dialog := dialog_open(buffer, width, height, 7, "Potwierdzenie", theme)
-	dialog_write(dialog, 2, "Element docelowy już istnieje:")
+	dialog := dialog_open(buffer, width, height, 7, tr("Potwierdzenie"), theme)
+	dialog_write(dialog, 2, tr("Element docelowy już istnieje:"))
 	dialog_write(dialog, 3, file_name, .Accent)
-	dialog_write(dialog, 5, " Enter/T Tak   Esc/N Nie   W Wszystkie ", .Action)
+	dialog_write(dialog, 5, tr(" Enter/T Tak   Esc/N Nie   W Wszystkie "), .Action)
 }
 
 draw_copy_progress_dialog :: proc(
@@ -250,7 +259,7 @@ draw_copy_progress_dialog :: proc(
 	percent: int,
 	theme: Theme,
 ) {
-	dialog := dialog_open(buffer, width, height, 7, "Kopiowanie", theme)
+	dialog := dialog_open(buffer, width, height, 7, tr("Kopiowanie"), theme)
 	dialog_write(dialog, 2, file_name)
 	dialog_progress(dialog, 4, percent)
 	percent_text: [16]byte
@@ -305,13 +314,13 @@ draw_panel :: proc(
 	if show_metadata {
 		permissions_x := content_x + content_width - PANEL_PERMISSIONS_WIDTH
 		size_x := permissions_x - PANEL_COLUMN_GAP - PANEL_SIZE_WIDTH
-		tui.buffer_write(buffer, name_x, rows_y, "Nazwa", border_style, size_x - name_x)
-		tui.buffer_write(buffer, size_x, rows_y, "Rozmiar", border_style, PANEL_SIZE_WIDTH)
+		tui.buffer_write(buffer, name_x, rows_y, tr("Nazwa"), border_style, size_x - name_x)
+		tui.buffer_write(buffer, size_x, rows_y, tr("Rozmiar"), border_style, PANEL_SIZE_WIDTH)
 		tui.buffer_write(
 			buffer,
 			permissions_x,
 			rows_y,
-			"Uprawnienia",
+			tr("Uprawnienia"),
 			border_style,
 			PANEL_PERMISSIONS_WIDTH,
 		)

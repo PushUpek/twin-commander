@@ -19,6 +19,9 @@ App_State :: struct {
 	status:            string,
 	overwrite_pending: bool,
 	copy_edit_pending: bool,
+	create_edit_pending: bool,
+	create_name: string,
+	create_name_cursor: int,
 	move_edit_pending: bool,
 	move_pending:      bool,
 	delete_pending:    bool,
@@ -41,6 +44,7 @@ app_destroy :: proc(app: ^App_State) {
 	delete(app.status)
 	delete(app.copy_target_name)
 	delete(app.move_name)
+	delete(app.create_name)
 }
 
 set_status :: proc(app: ^App_State, status: string) {

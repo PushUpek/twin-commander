@@ -1,0 +1,11 @@
+# Only differences from Kanso Mist are needed.
+name = "Kanso Amber"
+
+[panel_border_active]
+foreground = "#E6B450"
+
+[dialog_border]
+foreground = "#E6B450"
+
+[dialog_action]
+background = "#E6B450"
