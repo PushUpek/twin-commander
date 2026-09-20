@@ -6,13 +6,13 @@ import "core:strconv"
 import "core:strings"
 import "tc:internal/tui"
 
-load_theme_file :: proc(path: string, allocator: runtime.Allocator) -> (Theme, bool) {
+load_theme_file :: proc(path: string, allocator: runtime.Allocator, base: Theme = {}) -> (Theme, bool) {
 	data, err := os.read_entire_file(path, context.temp_allocator)
 	if err != nil {
 		return {}, false
 	}
 	defer delete(data, context.temp_allocator)
-	theme, ok := parse_theme(string(data))
+	theme, ok := parse_theme(string(data), base)
 	if !ok {
 		return {}, false
 	}
@@ -32,8 +32,8 @@ theme_destroy :: proc(theme: ^Theme) {
 	theme^ = {}
 }
 
-parse_theme :: proc(data: string) -> (Theme, bool) {
-	theme: Theme
+parse_theme :: proc(data: string, base: Theme = {}) -> (Theme, bool) {
+	theme := base
 	section := ""
 	rest := data
 
@@ -153,16 +153,13 @@ apply_style_value :: proc(style: ^tui.Style, key, value: string) -> bool {
 		if !ok {
 			return false
 		}
-		if !enabled {
-			return true
-		}
 		switch key {
 		case "bold":
-			style.attributes += {.Bold}
+			if enabled { style.attributes += {.Bold} } else { style.attributes -= {.Bold} }
 		case "dim":
-			style.attributes += {.Dim}
+			if enabled { style.attributes += {.Dim} } else { style.attributes -= {.Dim} }
 		case "underline":
-			style.attributes += {.Underline}
+			if enabled { style.attributes += {.Underline} } else { style.attributes -= {.Underline} }
 		}
 		return true
 	}

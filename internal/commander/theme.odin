@@ -2,6 +2,7 @@ package commander
 
 import "base:runtime"
 import "core:os"
+import "core:fmt"
 import "core:strings"
 import themes "./themes"
 
@@ -9,13 +10,26 @@ Theme_Mode :: themes.Mode
 Theme :: themes.Theme
 
 load_theme :: proc(mode: Theme_Mode, allocator: runtime.Allocator) -> (Theme, bool) {
+	base: Theme
+	ok: bool
 	switch mode {
 	case .Light:
-		return themes.light_kanso_pearl(allocator)
+		base, ok = themes.light_kanso_pearl(allocator)
 	case .Dark:
-		return themes.dark_kanso_mist(allocator)
+		base, ok = themes.dark_kanso_mist(allocator)
 	}
-	return {}, false
+	if !ok { return {}, false }
+	variable := "TWIN_COMMANDER_DARK_THEME"
+	if mode == .Light { variable = "TWIN_COMMANDER_LIGHT_THEME" }
+	path := os.get_env(variable, context.temp_allocator)
+	if len(path) == 0 { return base, true }
+	custom, custom_ok := themes.load_theme_file(path, allocator, base)
+	if !custom_ok {
+		fmt.eprintf("Invalid theme file %s; using Kanso default\n", path)
+		return base, true
+	}
+	themes.theme_destroy(&base)
+	return custom, true
 }
 
 theme_for :: proc(mode: Theme_Mode) -> Theme {

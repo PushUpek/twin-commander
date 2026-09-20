@@ -33,7 +33,7 @@ handle_move_edit_event :: proc(app: ^App_State, event: tui.Event) {
 	switch handle_name_edit_input(&app.move_name, &app.move_name_cursor, event) {
 	case .Cancel:
 		clear_move_edit(app)
-		set_status(app, strings.clone("Anulowano przenoszenie") or_else "")
+		set_status(app, strings.clone(tr("Anulowano przenoszenie")) or_else "")
 	case .Submit:
 		if !target_name_is_valid(app.move_name) {
 			set_status(app, invalid_target_name_status())
@@ -72,7 +72,7 @@ prepare_move :: proc(app: ^App_State, target_name: string) {
 		}
 		delete(destination_path)
 		if destination_err != .Not_Exist {
-			set_status(app, fmt.aprintf("Nie można sprawdzić celu %s: %s", file.name, os.error_string(destination_err)))
+			set_status(app, fmt.aprintf(tr("Nie można sprawdzić celu %s: %s"), file.name, os.error_string(destination_err)))
 			return
 		}
 	}
@@ -89,7 +89,7 @@ handle_move_overwrite_event :: proc(app: ^App_State, event: tui.Event) {
 	app.pending_count = 0
 	if choice == .No {
 		clear_move_edit(app)
-		set_status(app, strings.clone("Anulowano przenoszenie") or_else "")
+		set_status(app, strings.clone(tr("Anulowano przenoszenie")) or_else "")
 		return
 	}
 	perform_move(app, true, app.move_name)
@@ -99,12 +99,12 @@ handle_move_overwrite_event :: proc(app: ^App_State, event: tui.Event) {
 move_entries :: proc(app: ^App_State) -> ([dynamic]os.File_Info, bool) {
 	entries := panel_operation_entries(&app.panels[app.active_panel])
 	if len(entries) == 0 {
-		set_status(app, strings.clone("Wybierz plik lub katalog do przeniesienia") or_else "")
+		set_status(app, strings.clone(tr("Wybierz plik lub katalog do przeniesienia")) or_else "")
 		return entries, false
 	}
 	for file in entries {
 		if file.type != .Regular && file.type != .Directory {
-			set_status(app, fmt.aprintf("F6 przenosi pliki i katalogi; %s ma nieobsługiwany typ", file.name))
+			set_status(app, fmt.aprintf(tr("F6 przenosi pliki i katalogi; %s ma nieobsługiwany typ"), file.name))
 			return entries, false
 		}
 	}
@@ -117,15 +117,15 @@ move_destination :: proc(app: ^App_State, file: os.File_Info, target_name: strin
 	if len(target_name) > 0 do name = target_name
 	destination_path := filepath.join({destination_panel.path, name}) or_else ""
 	if len(destination_path) == 0 {
-		set_status(app, strings.clone("Nie udało się zbudować ścieżki docelowej") or_else "")
+		set_status(app, strings.clone(tr("Nie udało się zbudować ścieżki docelowej")) or_else "")
 		return destination_path, false
 	}
 	if file.fullpath == destination_path {
-		set_status(app, strings.clone("Źródło i cel są tym samym elementem") or_else "")
+		set_status(app, strings.clone(tr("Źródło i cel są tym samym elementem")) or_else "")
 		return destination_path, false
 	}
 	if file.type == .Directory && path_is_inside(destination_panel.path, file.fullpath) {
-		set_status(app, strings.clone("Nie można przenieść katalogu do jego wnętrza") or_else "")
+		set_status(app, strings.clone(tr("Nie można przenieść katalogu do jego wnętrza")) or_else "")
 		return destination_path, false
 	}
 	return destination_path, true
@@ -155,7 +155,7 @@ perform_move :: proc(app: ^App_State, replace: bool, target_name: string = "") {
 		if move_err != nil {
 			panel_refresh(source_panel)
 			panel_refresh(destination_panel)
-			set_status(app, fmt.aprintf("Błąd przenoszenia %s (%d/%d): %s", name, index + 1, entry_count, os.error_string(move_err)))
+			set_status(app, fmt.aprintf(tr("Błąd przenoszenia %s (%d/%d): %s"), name, index + 1, entry_count, os.error_string(move_err)))
 			delete(name)
 			return
 		}
@@ -164,10 +164,10 @@ perform_move :: proc(app: ^App_State, replace: bool, target_name: string = "") {
 	source_refresh_err := panel_refresh(source_panel)
 	destination_refresh_err := panel_refresh(destination_panel)
 	if source_refresh_err != nil || destination_refresh_err != nil {
-		set_status(app, fmt.aprintf("Przeniesiono %d elementów, ale nie udało się odświeżyć paneli", entry_count))
+		set_status(app, fmt.aprintf(tr("Przeniesiono %d elementów, ale nie udało się odświeżyć paneli"), entry_count))
 		return
 	}
-	set_status(app, fmt.aprintf("Przeniesiono %d elementów do %s", entry_count, destination_panel.path))
+	set_status(app, fmt.aprintf(tr("Przeniesiono %d elementów do %s"), entry_count, destination_panel.path))
 }
 
 delete_selected_entry :: proc(app: ^App_State) {
@@ -186,7 +186,7 @@ handle_delete_event :: proc(app: ^App_State, event: tui.Event) {
 	app.pending_name = ""
 	app.pending_count = 0
 	if choice == .No {
-		set_status(app, strings.clone("Anulowano usuwanie") or_else "")
+		set_status(app, strings.clone(tr("Anulowano usuwanie")) or_else "")
 		return
 	}
 	perform_delete(app)
@@ -195,12 +195,12 @@ handle_delete_event :: proc(app: ^App_State, event: tui.Event) {
 delete_entries :: proc(app: ^App_State) -> ([dynamic]os.File_Info, bool) {
 	entries := panel_operation_entries(&app.panels[app.active_panel])
 	if len(entries) == 0 {
-		set_status(app, strings.clone("Wybierz plik lub katalog do usunięcia") or_else "")
+		set_status(app, strings.clone(tr("Wybierz plik lub katalog do usunięcia")) or_else "")
 		return entries, false
 	}
 	for file in entries {
 		if file.type != .Regular && file.type != .Directory {
-			set_status(app, fmt.aprintf("F8 usuwa pliki i katalogi; %s ma nieobsługiwany typ", file.name))
+			set_status(app, fmt.aprintf(tr("F8 usuwa pliki i katalogi; %s ma nieobsługiwany typ"), file.name))
 			return entries, false
 		}
 	}
@@ -220,23 +220,23 @@ perform_delete :: proc(app: ^App_State) {
 		if delete_err := fsops.Delete_Entry(file.fullpath); delete_err != nil {
 			panel_refresh(panel)
 			if refresh_other do panel_refresh(other_panel)
-			set_status(app, fmt.aprintf("Błąd usuwania %s (%d/%d): %s", name, index + 1, entry_count, os.error_string(delete_err)))
+			set_status(app, fmt.aprintf(tr("Błąd usuwania %s (%d/%d): %s"), name, index + 1, entry_count, os.error_string(delete_err)))
 			delete(name)
 			return
 		}
 		delete(name)
 	}
 	if refresh_err := panel_refresh(panel); refresh_err != nil {
-		set_status(app, fmt.aprintf("Usunięto %d elementów, ale nie udało się odświeżyć panelu", entry_count))
+		set_status(app, fmt.aprintf(tr("Usunięto %d elementów, ale nie udało się odświeżyć panelu"), entry_count))
 		return
 	}
 	if refresh_other {
 		if refresh_err := panel_refresh(other_panel); refresh_err != nil {
-			set_status(app, fmt.aprintf("Usunięto %d elementów, ale nie udało się odświeżyć drugiego panelu", entry_count))
+			set_status(app, fmt.aprintf(tr("Usunięto %d elementów, ale nie udało się odświeżyć drugiego panelu"), entry_count))
 			return
 		}
 	}
-	set_status(app, fmt.aprintf("Usunięto %d elementów", entry_count))
+	set_status(app, fmt.aprintf(tr("Usunięto %d elementów"), entry_count))
 }
 
 confirmation_choice :: proc(event: tui.Event) -> Confirmation_Choice {

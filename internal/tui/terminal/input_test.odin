@@ -68,3 +68,21 @@ session_with_pending :: proc(value: string) -> Session {
 	session.pending_count = len(bytes)
 	return session
 }
+
+@(test)
+function_keys_support_ss3_and_csi_terminal_encodings :: proc(t: ^testing.T) {
+	for item in ([]struct {sequence: string, key: Key}{
+		{"\eOR", .F3}, {"\eOS", .F4},
+		{"\e[13~", .F3}, {"\e[14~", .F4},
+		{"\e[[C", .F3}, {"\e[[D", .F4},
+		{"\e[1;2R", .F3}, {"\e[1;2S", .F4},
+		{"\e[1;5R", .F3}, {"\e[1;5S", .F4},
+	}) {
+		session := session_with_pending(item.sequence)
+		event, ok := parse_pending(&session)
+		testing.expect(t, ok)
+		testing.expect_value(t, event.kind, Event_Kind.Key)
+		testing.expect_value(t, event.key, item.key)
+		testing.expect_value(t, session.pending_count, 0)
+	}
+}

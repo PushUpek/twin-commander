@@ -3,6 +3,7 @@ package commander
 import "core:os"
 import "core:path/filepath"
 import "core:testing"
+import "tc:internal/tui"
 
 @(test)
 panel_select_name_restores_file_selection :: proc(t: ^testing.T) {
@@ -25,4 +26,21 @@ panel_select_name_restores_file_selection :: proc(t: ^testing.T) {
 	testing.expect_value(t, panel.selected, 2)
 	testing.expect(t, !panel_select_name(&panel, "missing.txt"))
 	testing.expect_value(t, panel.selected, 2)
+}
+
+@(test)
+view_and_edit_letter_shortcuts_dispatch_without_function_keys :: proc(t: ^testing.T) {
+	app: App_State
+	defer app_destroy(&app)
+	ctx: tui.Context
+	running := true
+	for letter in "veVE" {
+		set_status(&app, "")
+		handle_event(&ctx, &app, tui.Event{kind = .Text, text = letter}, &running)
+		testing.expect_value(t, app.status, tr("Wybierz plik"))
+		testing.expect(t, running)
+	}
+	set_status(&app, "")
+	handle_event(&ctx, &app, tui.Event{kind = .Text, text = 'e', modifiers = {.Control}}, &running)
+	testing.expect_value(t, app.status, "")
 }
