@@ -2,15 +2,29 @@ package fsops
 
 import "core:os"
 import "core:path/filepath"
+import "core:sys/posix"
 
-Move_Entry :: proc(source_path, destination_path: string, replace: bool = false) -> os.Error {
+Move_Entry :: proc(
+	source_path, destination_path: string,
+	replace: bool = false,
+	on_progress: Progress_Proc = nil,
+	user_data: rawptr = nil,
+) -> os.Error {
 	if !replace {
-		return os.rename(source_path, destination_path)
+		move_err := os.rename(source_path, destination_path)
+		if is_cross_device(move_err) {
+			return copy_then_delete(source_path, destination_path, false, on_progress, user_data)
+		}
+		return move_err
 	}
 
-	destination_info, destination_err := os.stat(destination_path, context.allocator)
+	destination_info, destination_err := os.lstat(destination_path, context.allocator)
 	if destination_err == .Not_Exist {
-		return os.rename(source_path, destination_path)
+		move_err := os.rename(source_path, destination_path)
+		if is_cross_device(move_err) {
+			return copy_then_delete(source_path, destination_path, false, on_progress, user_data)
+		}
+		return move_err
 	}
 	if destination_err != nil {
 		return destination_err
@@ -46,6 +60,9 @@ Move_Entry :: proc(source_path, destination_path: string, replace: bool = false)
 		if rollback_err != nil {
 			return rollback_err
 		}
+		if is_cross_device(move_err) {
+			return copy_then_delete(source_path, destination_path, true, on_progress, user_data)
+		}
 		return move_err
 	}
 
@@ -55,12 +72,33 @@ Move_Entry :: proc(source_path, destination_path: string, replace: bool = false)
 	return os.remove(staging_path)
 }
 
+is_cross_device :: proc(err: os.Error) -> bool {
+	platform_error, ok := os.is_platform_error(err)
+	return ok && platform_error == i32(posix.Errno.EXDEV)
+}
+
+copy_then_delete :: proc(
+	source_path, destination_path: string,
+	replace: bool,
+	on_progress: Progress_Proc = nil,
+	user_data: rawptr = nil,
+) -> os.Error {
+	if copy_err := Copy_Entry(source_path, destination_path, replace, on_progress, user_data); copy_err != nil {
+		return copy_err
+	}
+	if delete_err := delete_path(source_path); delete_err != nil {
+		// The source remains authoritative if cleanup fails; do not destroy the completed copy.
+		return delete_err
+	}
+	return nil
+}
+
 Delete_Entry :: proc(path: string) -> os.Error {
 	return delete_path(path)
 }
 
 delete_path :: proc(path: string) -> os.Error {
-	info, stat_err := os.stat(path, context.allocator)
+	info, stat_err := os.lstat(path, context.allocator)
 	if stat_err != nil {
 		return stat_err
 	}

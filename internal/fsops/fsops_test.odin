@@ -299,3 +299,90 @@ load_directory_sorts_directories_before_files :: proc(t: ^testing.T) {
 		testing.expect_value(t, files[3].name, "z.txt")
 	}
 }
+
+@(test)
+directory_options_filter_hidden_files_and_change_sort_order :: proc(t: ^testing.T) {
+	temp_path, temp_err := os.make_directory_temp("", "twin-commander-options-*", context.allocator)
+	if !testing.expect(t, temp_err == nil) do return
+	defer delete(temp_path)
+	defer os.remove_all(temp_path)
+
+	names := [?]string{"small.txt", "large.log", "notes.txt", ".hidden.txt"}
+	contents := [?]string{"1", "123456", "123", "secret"}
+	for name, index in names {
+		path := filepath.join({temp_path, name}) or_else ""
+		testing.expect(t, os.write_entire_file_from_string(path, contents[index]) == nil)
+		delete(path)
+	}
+
+	options := Directory_Options{filter = ".txt", sort_kind = .Size, reverse = true}
+	absolute, files, load_err := Load_Directory(temp_path, context.allocator, options)
+	defer delete(absolute)
+	defer if files != nil do os.file_info_slice_delete(files, context.allocator)
+	if !testing.expect(t, load_err == nil) do return
+	testing.expect_value(t, len(files), 2)
+	if len(files) == 2 {
+		testing.expect_value(t, files[0].name, "notes.txt")
+		testing.expect_value(t, files[1].name, "small.txt")
+	}
+
+	options.show_hidden = true
+	absolute_hidden, hidden_files, hidden_err := Load_Directory(temp_path, context.allocator, options)
+	defer delete(absolute_hidden)
+	defer if hidden_files != nil do os.file_info_slice_delete(hidden_files, context.allocator)
+	testing.expect(t, hidden_err == nil)
+	testing.expect_value(t, len(hidden_files), 3)
+}
+
+@(test)
+symlinks_are_copied_and_deleted_without_touching_their_targets :: proc(t: ^testing.T) {
+	temp_path, temp_err := os.make_directory_temp("", "twin-commander-link-*", context.allocator)
+	if !testing.expect(t, temp_err == nil) do return
+	defer delete(temp_path)
+	defer os.remove_all(temp_path)
+
+	target := filepath.join({temp_path, "target.txt"}) or_else ""
+	source_link := filepath.join({temp_path, "source-link"}) or_else ""
+	copied_link := filepath.join({temp_path, "copied-link"}) or_else ""
+	defer delete(target)
+	defer delete(source_link)
+	defer delete(copied_link)
+	testing.expect(t, os.write_entire_file_from_string(target, "target") == nil)
+	testing.expect(t, os.symlink("target.txt", source_link) == nil)
+	testing.expect(t, Copy_Entry(source_link, copied_link) == nil)
+
+	copied_info, copied_err := os.lstat(copied_link, context.allocator)
+	defer if copied_err == nil do os.file_info_delete(copied_info, context.allocator)
+	testing.expect(t, copied_err == nil)
+	testing.expect_value(t, copied_info.type, os.File_Type.Symlink)
+	copied_target, read_err := os.read_link(copied_link, context.allocator)
+	defer delete(copied_target)
+	testing.expect(t, read_err == nil)
+	testing.expect_value(t, copied_target, "target.txt")
+
+	testing.expect(t, Delete_Entry(source_link) == nil)
+	target_info, target_err := os.stat(target, context.allocator)
+	defer if target_err == nil do os.file_info_delete(target_info, context.allocator)
+	testing.expect(t, target_err == nil)
+}
+
+@(test)
+copy_then_delete_move_fallback_preserves_content :: proc(t: ^testing.T) {
+	temp_path, temp_err := os.make_directory_temp("", "twin-commander-fallback-*", context.allocator)
+	if !testing.expect(t, temp_err == nil) do return
+	defer delete(temp_path)
+	defer os.remove_all(temp_path)
+
+	source := filepath.join({temp_path, "source.txt"}) or_else ""
+	destination := filepath.join({temp_path, "destination.txt"}) or_else ""
+	defer delete(source)
+	defer delete(destination)
+	testing.expect(t, os.write_entire_file_from_string(source, "moved across devices") == nil)
+	testing.expect(t, copy_then_delete(source, destination, false) == nil)
+	_, source_err := os.lstat(source, context.allocator)
+	testing.expect_value(t, source_err, os.Error(.Not_Exist))
+	content, read_err := os.read_entire_file(destination, context.allocator)
+	defer delete(content)
+	testing.expect(t, read_err == nil)
+	testing.expect_value(t, string(content), "moved across devices")
+}

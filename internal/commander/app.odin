@@ -88,6 +88,14 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		handle_create_edit_event(app, event)
 		return
 	}
+	if app.filter_edit_pending {
+		handle_filter_edit_event(app, event)
+		return
+	}
+	if app.mark_edit_pending {
+		handle_mark_edit_event(app, event)
+		return
+	}
 	if app.overwrite_pending {
 		handle_overwrite_event(ctx, app, event)
 		return
@@ -97,15 +105,15 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		return
 	}
 	if app.move_edit_pending {
-		handle_move_edit_event(app, event)
+		handle_move_edit_event(app, event, ctx)
 		return
 	}
 	if app.move_pending {
-		handle_move_overwrite_event(app, event)
+		handle_move_overwrite_event(app, event, ctx)
 		return
 	}
 	if app.delete_pending {
-		handle_delete_event(app, event)
+		handle_delete_event(app, event, ctx)
 		return
 	}
 
@@ -113,13 +121,38 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 	case .Key:
 		#partial switch event.key {
 		case .Escape, .F10:
-			app.exit_pending = true
+			panel := &app.panels[app.active_panel]
+			if event.key == .Escape && len(panel.quick_search) > 0 {
+				delete(panel.quick_search)
+				panel.quick_search = ""
+				set_status(app, strings.clone(tr("Wyczyszczono szybkie wyszukiwanie")) or_else "")
+			} else {
+				app.exit_pending = true
+			}
 		case .Tab:
 			app.active_panel = 1 - app.active_panel
 		case .Up:
 			panel_move_selection(&app.panels[app.active_panel], -1)
 		case .Down:
 			panel_move_selection(&app.panels[app.active_panel], 1)
+		case .Home:
+			panel_select_edge(&app.panels[app.active_panel], false)
+		case .End:
+			panel_select_edge(&app.panels[app.active_panel], true)
+		case .Page_Up:
+			_, height := tui.size(ctx)
+			panel_move_page(&app.panels[app.active_panel], -1, height - 5)
+		case .Page_Down:
+			_, height := tui.size(ctx)
+			panel_move_page(&app.panels[app.active_panel], 1, height - 5)
+		case .Left:
+			navigate_history(app, -1)
+		case .Right:
+			navigate_history(app, 1)
+		case .Backspace:
+			if !panel_quick_search_backspace(&app.panels[app.active_panel]) {
+				navigate_parent(app)
+			}
 		case .Enter:
 			enter_selected_directory(app)
 		case .F3:
@@ -129,7 +162,7 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		case .F5:
 			copy_selected_file(ctx, app)
 		case .F6:
-			move_selected_entry(app)
+			move_selected_entry(app, ctx)
 		case .F7:
 			begin_create_entry(app)
 		case .F8:
@@ -138,12 +171,36 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 	case .Text:
 		if .Control in event.modifiers && event.text == 'c' {
 			running^ = false
-		} else if event.modifiers == {} && (event.text == 'v' || event.text == 'V') {
+		} else if .Control in event.modifiers && event.text == 'r' {
+			refresh_active_panel(app)
+		} else if .Control in event.modifiers && event.text == 's' {
+			cycle_sort(app)
+		} else if .Control in event.modifiers && event.text == 'f' {
+			begin_filter_edit(app)
+		} else if .Control in event.modifiers && event.text == 'd' {
+			toggle_hidden(app)
+		} else if event.modifiers == {} && len(app.panels[app.active_panel].quick_search) == 0 && (event.text == 'v' || event.text == 'V') {
 			open_selected_file(ctx, app, .View, running)
-		} else if event.modifiers == {} && (event.text == 'e' || event.text == 'E') {
+		} else if event.modifiers == {} && len(app.panels[app.active_panel].quick_search) == 0 && (event.text == 'e' || event.text == 'E') {
 			open_selected_file(ctx, app, .Edit, running)
 		} else if event.text == ' ' {
 			panel_toggle_mark(&app.panels[app.active_panel])
+		} else if event.modifiers == {} && event.text == '/' {
+			begin_filter_edit(app)
+		} else if event.modifiers == {} && event.text == '+' {
+			begin_mark_pattern(app, .Select)
+		} else if event.modifiers == {} && event.text == '\\' {
+			begin_mark_pattern(app, .Unselect)
+		} else if event.modifiers == {} && event.text == '*' {
+			panel_invert_marks(&app.panels[app.active_panel])
+			set_status(app, strings.clone(tr("Odwrócono oznaczenie")) or_else "")
+		} else if event.modifiers == {} && event.text >= ' ' {
+			panel := &app.panels[app.active_panel]
+			if panel_quick_search(panel, event.text) {
+				set_status(app, fmt.aprintf(tr("Szybkie wyszukiwanie: %s"), panel.quick_search))
+			} else {
+				set_status(app, fmt.aprintf(tr("Brak nazwy zaczynającej się od: %s"), panel.quick_search))
+			}
 		}
 	}
 }
@@ -195,7 +252,15 @@ enter_selected_directory :: proc(app: ^App_State) {
 		target = filepath.join({panel.path, ".."}) or_else ""
 	} else {
 		file := panel.files[panel.selected - 1]
-		if file.type != .Directory {
+		is_directory := file.type == .Directory
+		if file.type == .Symlink {
+			followed, follow_err := os.stat(file.fullpath, context.allocator)
+			if follow_err == nil {
+				is_directory = followed.type == .Directory
+				os.file_info_delete(followed, context.allocator)
+			}
+		}
+		if !is_directory {
 			set_status(app, fmt.aprintf(tr("%s nie jest katalogiem"), file.name))
 			return
 		}

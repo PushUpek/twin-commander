@@ -14,7 +14,7 @@ Confirmation_Choice :: enum {
 	All,
 }
 
-move_selected_entry :: proc(app: ^App_State) {
+move_selected_entry :: proc(app: ^App_State, ctx: ^tui.Context = nil) {
 	entries, ok := move_entries(app)
 	defer delete(entries)
 	if !ok do return
@@ -26,10 +26,10 @@ move_selected_entry :: proc(app: ^App_State) {
 		return
 	}
 	clear_move_edit(app)
-	prepare_move(app, "")
+	prepare_move(app, "", ctx)
 }
 
-handle_move_edit_event :: proc(app: ^App_State, event: tui.Event) {
+handle_move_edit_event :: proc(app: ^App_State, event: tui.Event, ctx: ^tui.Context = nil) {
 	switch handle_name_edit_input(&app.move_name, &app.move_name_cursor, event) {
 	case .Cancel:
 		clear_move_edit(app)
@@ -39,7 +39,7 @@ handle_move_edit_event :: proc(app: ^App_State, event: tui.Event) {
 			set_status(app, invalid_target_name_status())
 			return
 		}
-		prepare_move(app, app.move_name)
+		prepare_move(app, app.move_name, ctx)
 	case .None:
 	}
 }
@@ -49,7 +49,7 @@ clear_move_edit :: proc(app: ^App_State) {
 	clear_edit_name(&app.move_name, &app.move_name_cursor)
 }
 
-prepare_move :: proc(app: ^App_State, target_name: string) {
+prepare_move :: proc(app: ^App_State, target_name: string, ctx: ^tui.Context = nil) {
 	entries, ok := move_entries(app)
 	defer delete(entries)
 	if !ok do return
@@ -59,7 +59,7 @@ prepare_move :: proc(app: ^App_State, target_name: string) {
 			delete(destination_path)
 			return
 		}
-		destination_info, destination_err := os.stat(destination_path, context.allocator)
+		destination_info, destination_err := os.lstat(destination_path, context.allocator)
 		if destination_err == nil {
 			os.file_info_delete(destination_info, context.allocator)
 			app.move_pending = true
@@ -77,11 +77,11 @@ prepare_move :: proc(app: ^App_State, target_name: string) {
 		}
 	}
 	app.move_edit_pending = false
-	perform_move(app, false, target_name)
+	perform_move(app, false, target_name, ctx)
 	clear_move_edit(app)
 }
 
-handle_move_overwrite_event :: proc(app: ^App_State, event: tui.Event) {
+handle_move_overwrite_event :: proc(app: ^App_State, event: tui.Event, ctx: ^tui.Context = nil) {
 	choice := confirmation_choice(event)
 	if choice == .None do return
 	app.move_pending = false
@@ -92,7 +92,7 @@ handle_move_overwrite_event :: proc(app: ^App_State, event: tui.Event) {
 		set_status(app, strings.clone(tr("Anulowano przenoszenie")) or_else "")
 		return
 	}
-	perform_move(app, true, app.move_name)
+	perform_move(app, true, app.move_name, ctx)
 	clear_move_edit(app)
 }
 
@@ -103,7 +103,7 @@ move_entries :: proc(app: ^App_State) -> ([dynamic]os.File_Info, bool) {
 		return entries, false
 	}
 	for file in entries {
-		if file.type != .Regular && file.type != .Directory {
+		if file.type != .Regular && file.type != .Directory && file.type != .Symlink {
 			set_status(app, fmt.aprintf(tr("F6 przenosi pliki i katalogi; %s ma nieobsługiwany typ"), file.name))
 			return entries, false
 		}
@@ -136,26 +136,66 @@ path_is_inside :: proc(path, directory: string) -> bool {
 	return os.is_path_separator(path[len(directory)])
 }
 
-perform_move :: proc(app: ^App_State, replace: bool, target_name: string = "") {
+perform_move :: proc(app: ^App_State, replace: bool, target_name: string = "", ctx: ^tui.Context = nil) {
 	entries, ok := move_entries(app)
 	defer delete(entries)
 	if !ok do return
 	source_panel := &app.panels[app.active_panel]
 	destination_panel := &app.panels[1 - app.active_panel]
 	entry_count := len(entries)
+	completed_count := 0
+	skipped_count := 0
+	cancelled := false
+	progress_context := Copy_UI_Context{tui = ctx, app = app}
+	delete(app.operation_label)
+	app.operation_label = strings.clone(tr("Przenoszenie")) or_else ""
 	for file, index in entries {
+		if operation_cancel_requested(ctx) {
+			cancelled = true
+			break
+		}
 		destination_path, path_ok := move_destination(app, file, target_name)
 		if !path_ok {
 			delete(destination_path)
 			return
 		}
 		name := strings.clone(file.name) or_else ""
-		move_err := fsops.Move_Entry(file.fullpath, destination_path, replace)
+		move_err: os.Error
+		for {
+			progress_context.cancelled = false
+			app.copying = true
+			app.copy_name = file.name
+			app.copy_percent = 0
+			progress_proc: fsops.Progress_Proc
+			progress_data: rawptr
+			if ctx != nil {
+				progress_proc = on_copy_progress
+				progress_data = rawptr(&progress_context)
+			}
+			move_err = fsops.Move_Entry(file.fullpath, destination_path, replace, progress_proc, progress_data)
+			app.copying = false
+			if move_err == nil {
+				completed_count += 1
+				break
+			}
+			if progress_context.cancelled do break
+			choice := ask_operation_error(ctx, app, file.name, move_err)
+			if choice == .Retry do continue
+			if choice == .Skip {
+				skipped_count += 1
+				move_err = nil
+			}
+			break
+		}
 		delete(destination_path)
 		if move_err != nil {
 			panel_refresh(source_panel)
 			panel_refresh(destination_panel)
-			set_status(app, fmt.aprintf(tr("Błąd przenoszenia %s (%d/%d): %s"), name, index + 1, entry_count, os.error_string(move_err)))
+			if progress_context.cancelled {
+				set_status(app, fmt.aprintf(tr("Anulowano przenoszenie po %d z %d elementów"), completed_count, entry_count))
+			} else {
+				set_status(app, fmt.aprintf(tr("Błąd przenoszenia %s (%d/%d): %s"), name, index + 1, entry_count, os.error_string(move_err)))
+			}
 			delete(name)
 			return
 		}
@@ -167,7 +207,15 @@ perform_move :: proc(app: ^App_State, replace: bool, target_name: string = "") {
 		set_status(app, fmt.aprintf(tr("Przeniesiono %d elementów, ale nie udało się odświeżyć paneli"), entry_count))
 		return
 	}
-	set_status(app, fmt.aprintf(tr("Przeniesiono %d elementów do %s"), entry_count, destination_panel.path))
+	if cancelled {
+		set_status(app, fmt.aprintf(tr("Anulowano przenoszenie po %d z %d elementów"), completed_count, entry_count))
+		return
+	}
+	if skipped_count > 0 {
+		set_status(app, fmt.aprintf(tr("Przeniesiono %d, pominięto %d elementów"), completed_count, skipped_count))
+	} else {
+		set_status(app, fmt.aprintf(tr("Przeniesiono %d elementów do %s"), completed_count, destination_panel.path))
+	}
 }
 
 delete_selected_entry :: proc(app: ^App_State) {
@@ -179,7 +227,7 @@ delete_selected_entry :: proc(app: ^App_State) {
 	app.pending_count = len(entries)
 }
 
-handle_delete_event :: proc(app: ^App_State, event: tui.Event) {
+handle_delete_event :: proc(app: ^App_State, event: tui.Event, ctx: ^tui.Context = nil) {
 	choice := confirmation_choice(event)
 	if choice == .None do return
 	app.delete_pending = false
@@ -189,7 +237,7 @@ handle_delete_event :: proc(app: ^App_State, event: tui.Event) {
 		set_status(app, strings.clone(tr("Anulowano usuwanie")) or_else "")
 		return
 	}
-	perform_delete(app)
+	perform_delete(app, ctx)
 }
 
 delete_entries :: proc(app: ^App_State) -> ([dynamic]os.File_Info, bool) {
@@ -199,7 +247,7 @@ delete_entries :: proc(app: ^App_State) -> ([dynamic]os.File_Info, bool) {
 		return entries, false
 	}
 	for file in entries {
-		if file.type != .Regular && file.type != .Directory {
+		if file.type != .Regular && file.type != .Directory && file.type != .Symlink {
 			set_status(app, fmt.aprintf(tr("F8 usuwa pliki i katalogi; %s ma nieobsługiwany typ"), file.name))
 			return entries, false
 		}
@@ -207,7 +255,7 @@ delete_entries :: proc(app: ^App_State) -> ([dynamic]os.File_Info, bool) {
 	return entries, true
 }
 
-perform_delete :: proc(app: ^App_State) {
+perform_delete :: proc(app: ^App_State, ctx: ^tui.Context = nil) {
 	entries, ok := delete_entries(app)
 	defer delete(entries)
 	if !ok do return
@@ -215,9 +263,32 @@ perform_delete :: proc(app: ^App_State) {
 	other_panel := &app.panels[1 - app.active_panel]
 	refresh_other := panel.path == other_panel.path
 	entry_count := len(entries)
+	completed_count := 0
+	skipped_count := 0
+	cancelled := false
 	for file, index in entries {
 		name := strings.clone(file.name) or_else ""
-		if delete_err := fsops.Delete_Entry(file.fullpath); delete_err != nil {
+		if operation_cancel_requested(ctx) {
+			cancelled = true
+			delete(name)
+			break
+		}
+		delete_err: os.Error
+		for {
+			delete_err = fsops.Delete_Entry(file.fullpath)
+			if delete_err == nil {
+				completed_count += 1
+				break
+			}
+			choice := ask_operation_error(ctx, app, name, delete_err)
+			if choice == .Retry do continue
+			if choice == .Skip {
+				skipped_count += 1
+				delete_err = nil
+			}
+			break
+		}
+		if delete_err != nil {
 			panel_refresh(panel)
 			if refresh_other do panel_refresh(other_panel)
 			set_status(app, fmt.aprintf(tr("Błąd usuwania %s (%d/%d): %s"), name, index + 1, entry_count, os.error_string(delete_err)))
@@ -236,7 +307,15 @@ perform_delete :: proc(app: ^App_State) {
 			return
 		}
 	}
-	set_status(app, fmt.aprintf(tr("Usunięto %d elementów"), entry_count))
+	if cancelled {
+		set_status(app, fmt.aprintf(tr("Anulowano usuwanie po %d z %d elementów"), completed_count, entry_count))
+		return
+	}
+	if skipped_count > 0 {
+		set_status(app, fmt.aprintf(tr("Usunięto %d, pominięto %d elementów"), completed_count, skipped_count))
+	} else {
+		set_status(app, fmt.aprintf(tr("Usunięto %d elementów"), completed_count))
+	}
 }
 
 confirmation_choice :: proc(event: tui.Event) -> Confirmation_Choice {
