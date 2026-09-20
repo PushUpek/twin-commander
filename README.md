@@ -26,9 +26,18 @@ Nie wymagają one czcionki Nerd Font.
 Obsługiwane klawisze:
 
 - `↑`/`↓` — zmiana zaznaczenia,
+- `Home`/`End`, `Page Up`/`Page Down` — początek, koniec i przewijanie panelu stronami,
 - `Enter` — wejście do zaznaczonego katalogu (wpis `..` przechodzi wyżej),
+- `Backspace` — przejście do katalogu nadrzędnego,
+- `←`/`→` — poprzedni lub następny katalog w historii aktywnego panelu,
 - `Tab` — przełączenie aktywnego panelu,
 - `Spacja` — oznaczenie lub odznaczenie elementu i przejście do następnego wiersza,
+- wpisywanie liter — szybkie wyszukiwanie nazwy od początku; `Backspace` lub `Esc` czyści wyszukiwanie,
+- `+` / `\` / `*` — oznaczenie grupy według maski, odznaczenie grupy lub odwrócenie oznaczenia,
+- `/` lub `Ctrl-F` — filtr aktywnego panelu po fragmencie nazwy; pusty filtr pokazuje wszystko,
+- `Ctrl-D` — pokazanie lub ukrycie plików zaczynających się od kropki,
+- `Ctrl-S` — następny sposób sortowania: nazwa, rozszerzenie, rozmiar, data modyfikacji; kolejny cykl odwraca kierunek,
+- `Ctrl-R` — odświeżenie panelu z zachowaniem kursora i istniejących oznaczeń,
 - `F3` lub `v` — otwarcie zaznaczonego pliku tylko do odczytu w zewnętrznym pagerze (`$PAGER`, domyślnie `less`),
 - `F4` lub `e` — otwarcie zaznaczonego pliku w zewnętrznym edytorze (`$VISUAL`, następnie `$EDITOR`, domyślnie `vi`),
 - `F5` — skopiowanie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu; dla pojedynczego elementu pozwala ustawić nazwę kopii,
@@ -49,6 +58,10 @@ potwierdzenie jego nadpisania. Popupy dla nadpisywania, przenoszenia i usuwania
 pojedynczego elementu oferują decyzje `Tak`, `Nie` oraz `Wszystkie`. Przy operacji
 na wielu oznaczonych elementach dialog pokazuje liczebność zestawu, a potwierdzenie
 dotyczy całej bieżącej operacji i nie wyłącza ostrzeżeń w przyszłości.
+Kopiowanie oraz wykonywane między różnymi systemami plików przenoszenie można
+przerwać klawiszem `Esc` lub `Ctrl-C`. Błąd operacji pozwala ponowić bieżący
+element, pominąć go albo przerwać cały zestaw. Linki symboliczne są kopiowane,
+przenoszone i usuwane jako linki, bez modyfikowania wskazywanego przez nie celu.
 
 Interfejs ma dwa odrębne szablony kolorystyczne: Kanso Pearl dla trybu jasnego
 i Kanso Mist dla trybu ciemnego. Ich definicje TOML znajdują się w
