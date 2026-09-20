@@ -41,7 +41,7 @@ Copy_Entry :: proc(
 		delete(actual_destination)
 	}
 	if replace {
-		if destination_info, destination_err := os.stat(destination_path, context.allocator);
+		if destination_info, destination_err := os.lstat(destination_path, context.allocator);
 		   destination_err == nil {
 			os.file_info_delete(destination_info, context.allocator)
 			destination_parent := filepath.dir(destination_path)
@@ -89,13 +89,16 @@ Copy_Entry :: proc(
 }
 
 entry_size :: proc(path: string) -> (i64, os.Error) {
-	info, stat_err := os.stat(path, context.allocator)
+	info, stat_err := os.lstat(path, context.allocator)
 	if stat_err != nil {
 		return 0, stat_err
 	}
 	defer os.file_info_delete(info, context.allocator)
 	if info.type == .Regular {
 		return info.size, nil
+	}
+	if info.type == .Symlink {
+		return 0, nil
 	}
 	if info.type != .Directory {
 		return 0, os.Error(io.Error.Unsupported)
@@ -121,13 +124,19 @@ copy_entry_recursive :: proc(
 	source_path, destination_path: string,
 	progress: ^Copy_Progress,
 ) -> os.Error {
-	info, stat_err := os.stat(source_path, context.allocator)
+	info, stat_err := os.lstat(source_path, context.allocator)
 	if stat_err != nil {
 		return stat_err
 	}
 	defer os.file_info_delete(info, context.allocator)
 	if info.type == .Regular {
 		return copy_file_with_progress(source_path, destination_path, info.mode, progress)
+	}
+	if info.type == .Symlink {
+		target, link_err := os.read_link(source_path, context.allocator)
+		if link_err != nil do return link_err
+		defer delete(target)
+		return os.symlink(target, destination_path)
 	}
 	if info.type != .Directory {
 		return os.Error(io.Error.Unsupported)

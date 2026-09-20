@@ -53,7 +53,8 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		status_buffer: [512]byte
 		status := fmt.bprintf(
 			status_buffer[:],
-			tr("Kopiowanie %s: %d%%"),
+			tr("%s %s: %d%%"),
+			app.operation_label,
 			app.copy_name,
 			app.copy_percent,
 		)
@@ -81,7 +82,7 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		buffer,
 		0,
 		height - 1,
-		tr("F3/v Podgląd  F4/e Edycja  F5 Kopiuj jako  F6 Przenieś/Zmień nazwę  F7 Utwórz  F8 Usuń  Tab Panel  Esc/F10 Koniec"),
+		tr("F3 Podgląd F4 Edycja F5 Kopiuj F6 Przenieś F7 Utwórz F8 Usuń  / Filtr  + Grupa  Ctrl-S Sortuj  F10 Koniec"),
 		theme.keys,
 		width,
 	)
@@ -92,6 +93,19 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		draw_name_edit_dialog(buffer, width, height, app.create_name, app.create_name_cursor,
 			tr("Utwórz plik / katalog"), tr("Enter Utwórz"), theme,
 			tr("Nazwa w aktywnym katalogu:"), tr("Ukośnik / = katalog (mkdir -p), bez / = plik"))
+	} else if app.filter_edit_pending {
+		draw_name_edit_dialog(buffer, width, height, app.filter_text, app.filter_cursor,
+			tr("Filtr panelu"), tr("Enter Zastosuj"), theme,
+			tr("Fragment nazwy (puste = bez filtra):"))
+	} else if app.mark_edit_pending {
+		title := tr("Oznacz grupę")
+		action := tr("Enter Oznacz")
+		if app.mark_mode == .Unselect {
+			title = tr("Odznacz grupę")
+			action = tr("Enter Odznacz")
+		}
+		draw_name_edit_dialog(buffer, width, height, app.mark_pattern, app.mark_pattern_cursor,
+			title, action, theme, tr("Wzorzec (* i ?):"))
 	} else if app.overwrite_pending {
 		if app.pending_count > 1 {
 			draw_bulk_confirmation_dialog(buffer, width, height, app.copy_name, app.pending_count, .Copy, theme)
@@ -124,7 +138,7 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 			draw_delete_dialog(buffer, width, height, app.pending_name, theme)
 		}
 	} else if app.copying {
-		draw_copy_progress_dialog(buffer, width, height, app.copy_name, app.copy_percent, theme)
+		draw_copy_progress_dialog(buffer, width, height, app.copy_name, app.copy_percent, theme, app.operation_label)
 	}
 }
 
@@ -266,14 +280,27 @@ draw_copy_progress_dialog :: proc(
 	file_name: string,
 	percent: int,
 	theme: Theme,
+	operation_label: string = "Kopiowanie",
 ) {
-	dialog := dialog_open(buffer, width, height, 7, tr("Kopiowanie"), theme)
+	dialog := dialog_open(buffer, width, height, 7, operation_label, theme)
 	dialog_write(dialog, 2, file_name)
 	dialog_progress(dialog, 4, percent)
 	percent_text: [16]byte
 	text := fmt.bprintf(percent_text[:], "%d%%", percent)
 	text_x := dialog.rect.x + (dialog.rect.width - len(text)) / 2
 	tui.buffer_write(buffer, text_x, dialog.rect.y + 5, text, theme.dialog_accent)
+}
+
+draw_operation_error_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	entry_name, message: string,
+	theme: Theme,
+) {
+	dialog := dialog_open(buffer, width, height, 9, tr("Błąd operacji"), theme)
+	dialog_write(dialog, 2, entry_name, .Accent)
+	dialog_write(dialog, 4, message)
+	dialog_write(dialog, 7, tr(" R Ponów   P Pomiń   Esc/A Przerwij "), .Action)
 }
 
 draw_panel :: proc(
