@@ -8,6 +8,8 @@ import "core:time"
 import "tc:internal/tui"
 
 Run :: proc() {
+	locale_init()
+	defer locale_destroy()
 	app: App_State
 	defer app_destroy(&app)
 	if mode, ok := theme_mode_override(); ok {
@@ -17,14 +19,14 @@ Run :: proc() {
 		app.theme_mode = system_mode
 	}
 	if !set_theme_mode(&app, app.theme_mode) {
-		fmt.eprintln("Nie można wczytać motywu z katalogu config/themes")
+		fmt.eprintln(tr("Nie można wczytać motywu z katalogu config/themes"))
 		return
 	}
 	last_system_theme_check := time.tick_now()
 
 	ui_context: tui.Context
 	if !tui.init(&ui_context) {
-		fmt.eprintln("Twin Commander wymaga interaktywnego terminala POSIX")
+		fmt.eprintln(tr("Twin Commander wymaga interaktywnego terminala POSIX"))
 		return
 	}
 	defer tui.destroy(&ui_context)
@@ -33,7 +35,7 @@ Run :: proc() {
 	if cwd_err != nil {
 		set_status(
 			&app,
-			fmt.aprintf("Nie można odczytać bieżącego katalogu: %s", os.error_string(cwd_err)),
+			fmt.aprintf(tr("Nie można odczytać bieżącego katalogu: %s"), os.error_string(cwd_err)),
 		)
 		cwd = strings.clone(".") or_else ""
 	}
@@ -43,12 +45,12 @@ Run :: proc() {
 		if err := panel_load(&app.panels[index], cwd); err != nil {
 			set_status(
 				&app,
-				fmt.aprintf("Nie można otworzyć katalogu: %s", os.error_string(err)),
+				fmt.aprintf(tr("Nie można otworzyć katalogu: %s"), os.error_string(err)),
 			)
 		}
 	}
 	if len(app.status) == 0 {
-		set_status(&app, strings.clone("Gotowy") or_else "")
+		set_status(&app, strings.clone(tr("Gotowy")) or_else "")
 	}
 
 	running := true
@@ -78,6 +80,10 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		return
 	}
 
+	if app.create_edit_pending {
+		handle_create_edit_event(app, event)
+		return
+	}
 	if app.overwrite_pending {
 		handle_overwrite_event(ctx, app, event)
 		return
@@ -120,12 +126,18 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			copy_selected_file(ctx, app)
 		case .F6:
 			move_selected_entry(app)
+		case .F7:
+			begin_create_entry(app)
 		case .F8:
 			delete_selected_entry(app)
 		}
 	case .Text:
 		if .Control in event.modifiers && event.text == 'c' {
 			running^ = false
+		} else if event.modifiers == {} && (event.text == 'v' || event.text == 'V') {
+			open_selected_file(ctx, app, .View, running)
+		} else if event.modifiers == {} && (event.text == 'e' || event.text == 'E') {
+			open_selected_file(ctx, app, .Edit, running)
 		} else if event.text == ' ' {
 			panel_toggle_mark(&app.panels[app.active_panel])
 		}
@@ -169,7 +181,7 @@ enter_selected_directory :: proc(app: ^App_State) {
 	} else {
 		file := panel.files[panel.selected - 1]
 		if file.type != .Directory {
-			set_status(app, fmt.aprintf("%s nie jest katalogiem", file.name))
+			set_status(app, fmt.aprintf(tr("%s nie jest katalogiem"), file.name))
 			return
 		}
 		target = strings.clone(file.fullpath) or_else ""
@@ -177,12 +189,12 @@ enter_selected_directory :: proc(app: ^App_State) {
 	defer delete(target)
 
 	if len(target) == 0 {
-		set_status(app, strings.clone("Nie udało się zbudować ścieżki") or_else "")
+		set_status(app, strings.clone(tr("Nie udało się zbudować ścieżki")) or_else "")
 		return
 	}
 	if err := panel_load(panel, target); err != nil {
-		set_status(app, fmt.aprintf("Nie można wejść do katalogu: %s", os.error_string(err)))
+		set_status(app, fmt.aprintf(tr("Nie można wejść do katalogu: %s"), os.error_string(err)))
 		return
 	}
-	set_status(app, fmt.aprintf("Katalog: %s", panel.path))
+	set_status(app, fmt.aprintf(tr("Katalog: %s"), panel.path))
 }
