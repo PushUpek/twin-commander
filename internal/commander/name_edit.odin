@@ -11,7 +11,7 @@ Name_Edit_Action :: enum {
 	Cancel,
 }
 
-handle_name_edit_input :: proc(name: ^string, cursor: ^int, event: tui.Event) -> Name_Edit_Action {
+handle_name_edit_input :: proc(name: ^string, cursor: ^int, event: tui.Event, allow_separator := false) -> Name_Edit_Action {
 	if event.kind == .Key {
 		#partial switch event.key {
 		case .Escape:
@@ -42,7 +42,7 @@ handle_name_edit_input :: proc(name: ^string, cursor: ^int, event: tui.Event) ->
 		}
 		return .None
 	}
-	if event.kind == .Text && event.text >= ' ' && event.text != rune(os.Path_Separator) {
+	if event.kind == .Text && event.text >= ' ' && (allow_separator || event.text != rune(os.Path_Separator)) {
 		encoded, width := utf8.encode_rune(event.text)
 		inserted := string(encoded[:width])
 		replace_edit_name(name, name^[:cursor^], inserted, name^[cursor^:])
@@ -68,5 +68,5 @@ target_name_is_valid :: proc(name: string) -> bool {
 }
 
 invalid_target_name_status :: proc() -> string {
-	return strings.clone("Podaj poprawną nazwę bez separatora katalogów") or_else ""
+	return strings.clone(tr("Podaj poprawną nazwę bez separatora katalogów")) or_else ""
 }

@@ -22,19 +22,19 @@ open_selected_file :: proc(
 
 	panel := &app.panels[app.active_panel]
 	if panel.selected == 0 || panel.selected > len(panel.files) {
-		set_status(app, strings.clone("Wybierz plik") or_else "")
+		set_status(app, strings.clone(tr("Wybierz plik")) or_else "")
 		return
 	}
 	file := panel.files[panel.selected - 1]
 	if file.type == .Directory {
-		set_status(app, fmt.aprintf("%s jest katalogiem", file.name))
+		set_status(app, fmt.aprintf(tr("%s jest katalogiem"), file.name))
 		return
 	}
 
 	tool := strings.clone(external_tool(action)) or_else ""
 	defer delete(tool)
 	if len(tool) == 0 {
-		set_status(app, strings.clone("Nie skonfigurowano programu zewnętrznego") or_else "")
+		set_status(app, strings.clone(tr("Nie skonfigurowano programu zewnętrznego")) or_else "")
 		return
 	}
 
@@ -66,15 +66,15 @@ open_selected_file :: proc(
 	}
 
 	if start_err != nil {
-		set_status(app, fmt.aprintf("Nie można uruchomić %s: %s", tool, os.error_string(start_err)))
+		set_status(app, fmt.aprintf(tr("Nie można uruchomić %s: %s"), tool, os.error_string(start_err)))
 		return
 	}
 	if wait_err != nil {
-		set_status(app, fmt.aprintf("Błąd programu %s: %s", tool, os.error_string(wait_err)))
+		set_status(app, fmt.aprintf(tr("Błąd programu %s: %s"), tool, os.error_string(wait_err)))
 		return
 	}
 	if !state.success || state.exit_code != 0 {
-		set_status(app, fmt.aprintf("Program %s zakończył się kodem %d", tool, state.exit_code))
+		set_status(app, fmt.aprintf(tr("Program %s zakończył się kodem %d"), tool, state.exit_code))
 		return
 	}
 
@@ -82,13 +82,13 @@ open_selected_file :: proc(
 		selected_name := strings.clone(file.name) or_else ""
 		defer delete(selected_name)
 		if err := panel_refresh(panel); err != nil {
-			set_status(app, fmt.aprintf("Nie można odświeżyć katalogu: %s", os.error_string(err)))
+			set_status(app, fmt.aprintf(tr("Nie można odświeżyć katalogu: %s"), os.error_string(err)))
 			return
 		}
 		panel_select_name(panel, selected_name)
-		set_status(app, fmt.aprintf("Zamknięto edycję %s", selected_name))
+		set_status(app, fmt.aprintf(tr("Zamknięto edycję %s"), selected_name))
 	} else {
-		set_status(app, fmt.aprintf("Zamknięto podgląd %s", file.name))
+		set_status(app, fmt.aprintf(tr("Zamknięto podgląd %s"), file.name))
 	}
 }
 

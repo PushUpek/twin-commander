@@ -10,9 +10,9 @@ all: build
 build: $(TARGET)
 
 ODIN_SOURCES := $(shell find cmd internal -name '*.odin')
-THEME_SOURCES := $(shell find config/themes -name '*.toml')
+CONFIG_SOURCES := $(shell find config -name '*.toml' -o -name '*.json')
 
-$(TARGET): $(ODIN_SOURCES) $(THEME_SOURCES)
+$(TARGET): $(ODIN_SOURCES) $(CONFIG_SOURCES)
 	mkdir -p $(BUILD_DIR)
 	$(ODIN) build ./cmd/twin-commander $(ODIN_FLAGS) -out:$(TARGET)
 
