@@ -80,6 +80,10 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		return
 	}
 
+	if app.exit_pending {
+		handle_exit_event(app, event, running)
+		return
+	}
 	if app.create_edit_pending {
 		handle_create_edit_event(app, event)
 		return
@@ -108,8 +112,8 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 	#partial switch event.kind {
 	case .Key:
 		#partial switch event.key {
-		case .Escape:
-			running^ = false
+		case .Escape, .F10:
+			app.exit_pending = true
 		case .Tab:
 			app.active_panel = 1 - app.active_panel
 		case .Up:
@@ -141,6 +145,17 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		} else if event.text == ' ' {
 			panel_toggle_mark(&app.panels[app.active_panel])
 		}
+	}
+}
+
+handle_exit_event :: proc(app: ^App_State, event: tui.Event, running: ^bool) {
+	choice := confirmation_choice(event)
+	#partial switch choice {
+	case .Yes:
+		app.exit_pending = false
+		running^ = false
+	case .No:
+		app.exit_pending = false
 	}
 }
 

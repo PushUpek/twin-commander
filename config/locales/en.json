@@ -1,7 +1,9 @@
 {
   "Terminal jest zbyt mały": "Terminal is too small",
   "Kopiowanie %s: %d%%": "Copying %s: %d%%",
-  "F3/v Podgląd  F4/e Edycja  F5 Kopiuj jako  F6 Przenieś/Zmień nazwę  F7 Utwórz  F8 Usuń  Tab Panel  Esc Koniec": "F3/v View  F4/e Edit  F5 Copy as  F6 Move/Rename  F7 Create  F8 Delete  Tab Panel  Esc Quit",
+  "F3/v Podgląd  F4/e Edycja  F5 Kopiuj jako  F6 Przenieś/Zmień nazwę  F7 Utwórz  F8 Usuń  Tab Panel  Esc/F10 Koniec": "F3/v View  F4/e Edit  F5 Copy as  F6 Move/Rename  F7 Create  F8 Delete  Tab Panel  Esc/F10 Quit",
+  "Potwierdzenie wyjścia": "Confirm exit",
+  "Czy na pewno zakończyć program?": "Are you sure you want to quit?",
   "Kopiuj jako": "Copy as",
   "Enter Kopiuj": "Enter Copy",
   "Przenieś / zmień nazwę": "Move / rename",

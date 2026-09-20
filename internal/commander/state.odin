@@ -17,6 +17,7 @@ App_State :: struct {
 	theme:             Theme,
 	theme_overridden:  bool,
 	status:            string,
+	exit_pending:      bool,
 	overwrite_pending: bool,
 	copy_edit_pending: bool,
 	create_edit_pending: bool,
