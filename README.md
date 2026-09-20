@@ -35,7 +35,8 @@ Obsługiwane klawisze:
 - `F6` — przeniesienie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu; dla pojedynczego elementu pozwala też zmienić nazwę docelową,
 - `F7` — tworzenie w aktywnym panelu: nazwa bez `/` tworzy pusty plik, z `/` katalog wraz z brakującymi katalogami nadrzędnymi (`mkdir -p`); istniejące pliki nie są nadpisywane,
 - `F8` — usunięcie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) po potwierdzeniu,
-- `Esc` lub `Ctrl-C` — zakończenie programu.
+- `Esc` lub `F10` — otwarcie dialogu potwierdzenia zakończenia programu.
+- `Ctrl-C` — natychmiastowe zakończenie programu.
 
 Na czas podglądu lub edycji Twin Commander oddaje zewnętrznemu programowi zwykły
 terminal. Po zamknięciu programu wraca do interfejsu i po edycji odświeża aktywny

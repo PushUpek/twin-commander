@@ -81,12 +81,14 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		buffer,
 		0,
 		height - 1,
-		tr("F3/v Podgląd  F4/e Edycja  F5 Kopiuj jako  F6 Przenieś/Zmień nazwę  F7 Utwórz  F8 Usuń  Tab Panel  Esc Koniec"),
+		tr("F3/v Podgląd  F4/e Edycja  F5 Kopiuj jako  F6 Przenieś/Zmień nazwę  F7 Utwórz  F8 Usuń  Tab Panel  Esc/F10 Koniec"),
 		theme.keys,
 		width,
 	)
 
-	if app.create_edit_pending {
+	if app.exit_pending {
+		draw_exit_dialog(buffer, width, height, theme)
+	} else if app.create_edit_pending {
 		draw_name_edit_dialog(buffer, width, height, app.create_name, app.create_name_cursor,
 			tr("Utwórz plik / katalog"), tr("Enter Utwórz"), theme,
 			tr("Nazwa w aktywnym katalogu:"), tr("Ukośnik / = katalog (mkdir -p), bez / = plik"))
@@ -124,6 +126,12 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	} else if app.copying {
 		draw_copy_progress_dialog(buffer, width, height, app.copy_name, app.copy_percent, theme)
 	}
+}
+
+draw_exit_dialog :: proc(buffer: ^tui.Buffer, width, height: int, theme: Theme) {
+	dialog := dialog_open(buffer, width, height, 6, tr("Potwierdzenie wyjścia"), theme)
+	dialog_write(dialog, 2, tr("Czy na pewno zakończyć program?"))
+	dialog_write(dialog, 4, tr(" Enter/T Tak   Esc/N Nie "), .Action)
 }
 
 draw_move_edit_dialog :: proc(
