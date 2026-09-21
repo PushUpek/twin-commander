@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:os"
 import "core:strconv"
 import "core:strings"
+import "core:sys/posix"
 import "core:time"
 import "tc:internal/tui"
 
@@ -31,9 +32,37 @@ begin_properties :: proc(app: ^App_State) {
 	} else {
 		app.property_modified = strings.clone("-") or_else ""
 	}
+	if accessed, ok := time.time_to_rfc3339(info.access_time, 0, false); ok {
+		app.property_accessed = accessed
+	} else {
+		app.property_accessed = strings.clone("-") or_else ""
+	}
+	if created, ok := time.time_to_rfc3339(info.creation_time, 0, false); ok {
+		app.property_created = created
+	} else {
+		app.property_created = strings.clone("-") or_else ""
+	}
+	load_property_identity(app, info.fullpath)
 	app.property_mode = fmt.aprintf("%03o", transmute(u32)info.mode & 0o777)
 	app.property_mode_cursor = len(app.property_mode)
 	app.properties_pending = true
+}
+
+load_property_identity :: proc(app: ^App_State, path: string) {
+	c_path := strings.clone_to_cstring(path, context.temp_allocator) or_else nil
+	if c_path == nil do return
+	stat: posix.stat_t
+	if posix.lstat(c_path, &stat) != nil do return
+	if user := posix.getpwuid(stat.st_uid); user != nil {
+		app.property_owner = strings.clone(string(user.pw_name)) or_else ""
+	} else {
+		app.property_owner = fmt.aprintf("%d", stat.st_uid)
+	}
+	if group := posix.getgrgid(stat.st_gid); group != nil {
+		app.property_group = strings.clone(string(group.gr_name)) or_else ""
+	} else {
+		app.property_group = fmt.aprintf("%d", stat.st_gid)
+	}
 }
 
 clear_property :: proc(app: ^App_State) {
@@ -41,12 +70,20 @@ clear_property :: proc(app: ^App_State) {
 	delete(app.property_name)
 	delete(app.property_kind)
 	delete(app.property_modified)
+	delete(app.property_accessed)
+	delete(app.property_created)
 	delete(app.property_mode)
+	delete(app.property_owner)
+	delete(app.property_group)
 	app.property_path = ""
 	app.property_name = ""
 	app.property_kind = ""
 	app.property_modified = ""
+	app.property_accessed = ""
+	app.property_created = ""
 	app.property_mode = ""
+	app.property_owner = ""
+	app.property_group = ""
 	app.property_mode_cursor = 0
 	app.property_size = 0
 	app.property_is_symlink = false

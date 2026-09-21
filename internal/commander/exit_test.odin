@@ -4,24 +4,26 @@ import "core:testing"
 import "tc:internal/tui"
 
 @(test)
-escape_and_f10_require_confirmation_before_exit :: proc(t: ^testing.T) {
-	for key in ([]tui.Key{tui.Key.Escape, tui.Key.F10}) {
-		app: App_State
-		running := true
+only_f10_requires_confirmation_before_exit :: proc(t: ^testing.T) {
+	app: App_State
+	running := true
 
-		handle_event(nil, &app, tui.Event{kind = .Key, key = key}, &running)
-		testing.expect(t, running)
-		testing.expect(t, app.exit_pending)
+	handle_event(nil, &app, tui.Event{kind = .Key, key = .Escape}, &running)
+	testing.expect(t, running)
+	testing.expect(t, !app.exit_pending)
 
-		handle_event(nil, &app, tui.Event{kind = .Key, key = .Escape}, &running)
-		testing.expect(t, running)
-		testing.expect(t, !app.exit_pending)
+	handle_event(nil, &app, tui.Event{kind = .Key, key = .F10}, &running)
+	testing.expect(t, running)
+	testing.expect(t, app.exit_pending)
 
-		handle_event(nil, &app, tui.Event{kind = .Key, key = key}, &running)
-		handle_event(nil, &app, tui.Event{kind = .Key, key = .Enter}, &running)
-		testing.expect(t, !running)
-		testing.expect(t, !app.exit_pending)
-	}
+	handle_event(nil, &app, tui.Event{kind = .Key, key = .Escape}, &running)
+	testing.expect(t, running)
+	testing.expect(t, !app.exit_pending)
+
+	handle_event(nil, &app, tui.Event{kind = .Key, key = .F10}, &running)
+	handle_event(nil, &app, tui.Event{kind = .Key, key = .Enter}, &running)
+	testing.expect(t, !running)
+	testing.expect(t, !app.exit_pending)
 }
 
 @(test)
