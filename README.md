@@ -38,6 +38,10 @@ Obsługiwane klawisze:
 - `Ctrl-D` — pokazanie lub ukrycie plików zaczynających się od kropki,
 - `Ctrl-S` — następny sposób sortowania: nazwa, rozszerzenie, rozmiar, data modyfikacji; kolejny cykl odwraca kierunek,
 - `Ctrl-R` — odświeżenie panelu z zachowaniem kursora i istniejących oznaczeń,
+- `Alt-F7` lub `Ctrl-G` — rekurencyjne wyszukiwanie po fragmencie nazwy od katalogu aktywnego panelu; `Enter` na wyniku przechodzi do elementu,
+- `Ctrl-P` — właściwości wybranego elementu i zmiana uprawnień w zapisie ósemkowym (`000`–`777`); dla symlinków właściwości są tylko do odczytu,
+- `Ctrl-B` — zakładki katalogów; `A` dodaje bieżący katalog, `D` usuwa zakładkę, a `Enter` ją otwiera,
+- `Ctrl-Q` — porównanie obu paneli i oznaczenie elementów brakujących lub różniących się typem, rozmiarem albo datą modyfikacji,
 - `F3` lub `v` — otwarcie zaznaczonego pliku tylko do odczytu w zewnętrznym pagerze (`$PAGER`, domyślnie `less`),
 - `F4` lub `e` — otwarcie zaznaczonego pliku w zewnętrznym edytorze (`$VISUAL`, następnie `$EDITOR`, domyślnie `vi`),
 - `F5` — skopiowanie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu; dla pojedynczego elementu pozwala ustawić nazwę kopii,
@@ -62,6 +66,10 @@ Kopiowanie oraz wykonywane między różnymi systemami plików przenoszenie moż
 przerwać klawiszem `Esc` lub `Ctrl-C`. Błąd operacji pozwala ponowić bieżący
 element, pominąć go albo przerwać cały zestaw. Linki symboliczne są kopiowane,
 przenoszone i usuwane jako linki, bez modyfikowania wskazywanego przez nie celu.
+Wyszukiwanie obejmuje podkatalogi i respektuje ustawienie widoczności plików
+ukrytych; lista jest ograniczona do 5000 wyników. Zakładki istnieją w ramach
+bieżącej sesji programu. Porównanie paneli działa na ich bieżącej, nierozwijanej
+rekurencyjnie zawartości; katalogi o tej samej nazwie i typie są uznawane za zgodne.
 
 Interfejs ma dwa odrębne szablony kolorystyczne: Kanso Pearl dla trybu jasnego
 i Kanso Mist dla trybu ciemnego. Ich definicje TOML znajdują się w

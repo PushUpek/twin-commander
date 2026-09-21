@@ -96,6 +96,22 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		handle_mark_edit_event(app, event)
 		return
 	}
+	if app.search_edit_pending {
+		handle_search_edit_event(app, event)
+		return
+	}
+	if app.search_results_pending {
+		handle_search_results_event(app, event)
+		return
+	}
+	if app.properties_pending {
+		handle_properties_event(app, event)
+		return
+	}
+	if app.bookmarks_pending {
+		handle_bookmarks_event(app, event)
+		return
+	}
 	if app.overwrite_pending {
 		handle_overwrite_event(ctx, app, event)
 		return
@@ -164,7 +180,11 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		case .F6:
 			move_selected_entry(app, ctx)
 		case .F7:
-			begin_create_entry(app)
+			if .Alt in event.modifiers {
+				begin_search(app)
+			} else {
+				begin_create_entry(app)
+			}
 		case .F8:
 			delete_selected_entry(app)
 		}
@@ -179,6 +199,14 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			begin_filter_edit(app)
 		} else if .Control in event.modifiers && event.text == 'd' {
 			toggle_hidden(app)
+		} else if .Control in event.modifiers && event.text == 'g' {
+			begin_search(app)
+		} else if .Control in event.modifiers && event.text == 'p' {
+			begin_properties(app)
+		} else if .Control in event.modifiers && event.text == 'b' {
+			begin_bookmarks(app)
+		} else if .Control in event.modifiers && event.text == 'q' {
+			compare_panels(app)
 		} else if event.modifiers == {} && len(app.panels[app.active_panel].quick_search) == 0 && (event.text == 'v' || event.text == 'V') {
 			open_selected_file(ctx, app, .View, running)
 		} else if event.modifiers == {} && len(app.panels[app.active_panel].quick_search) == 0 && (event.text == 'e' || event.text == 'E') {
