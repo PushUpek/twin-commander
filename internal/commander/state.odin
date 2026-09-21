@@ -8,6 +8,12 @@ Mark_Mode :: enum {
 	Unselect,
 }
 
+Menu_Kind :: enum {
+	None,
+	User,
+	Main,
+}
+
 Panel_State :: struct {
 	path:     string,
 	files:    []os.File_Info,
@@ -21,6 +27,9 @@ Panel_State :: struct {
 	history: [dynamic]string,
 	history_index: int,
 	quick_search: string,
+	free_bytes: i64,
+	total_bytes: i64,
+	space_known: bool,
 }
 
 App_State :: struct {
@@ -50,6 +59,7 @@ App_State :: struct {
 	search_results_pending: bool,
 	search_query: string,
 	search_query_cursor: int,
+	search_contents: bool,
 	search_root: string,
 	search_results: [dynamic]string,
 	search_selected: int,
@@ -58,13 +68,24 @@ App_State :: struct {
 	property_name: string,
 	property_kind: string,
 	property_modified: string,
+	property_accessed: string,
+	property_created: string,
 	property_size: i64,
 	property_mode: string,
 	property_mode_cursor: int,
+	property_owner: string,
+	property_group: string,
 	property_is_symlink: bool,
 	bookmarks_pending: bool,
 	bookmarks: [dynamic]string,
 	bookmark_selected: int,
+	bookmarks_file: string,
+	command_edit_pending: bool,
+	command_text: string,
+	command_cursor: int,
+	help_pending: bool,
+	menu_kind: Menu_Kind,
+	menu_selected: int,
 	copying:           bool,
 	copy_name:         string,
 	copy_target_name:  string,
@@ -96,9 +117,15 @@ app_destroy :: proc(app: ^App_State) {
 	delete(app.property_name)
 	delete(app.property_kind)
 	delete(app.property_modified)
+	delete(app.property_accessed)
+	delete(app.property_created)
 	delete(app.property_mode)
+	delete(app.property_owner)
+	delete(app.property_group)
 	for path in app.bookmarks do delete(path)
 	delete(app.bookmarks)
+	delete(app.bookmarks_file)
+	delete(app.command_text)
 	delete(app.operation_label)
 }
 

@@ -49,6 +49,7 @@ Run :: proc() {
 			)
 		}
 	}
+	bookmarks_load(&app)
 	if len(app.status) == 0 {
 		set_status(&app, strings.clone(tr("Gotowy")) or_else "")
 	}
@@ -82,6 +83,18 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 
 	if app.exit_pending {
 		handle_exit_event(app, event, running)
+		return
+	}
+	if app.help_pending {
+		if event.kind == .Key && (event.key == .Escape || event.key == .Enter || event.key == .F1) do app.help_pending = false
+		return
+	}
+	if app.menu_kind != .None {
+		handle_menu_event(ctx, app, event, running)
+		return
+	}
+	if app.command_edit_pending {
+		handle_command_event(ctx, app, event, running)
 		return
 	}
 	if app.create_edit_pending {
@@ -136,15 +149,21 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 	#partial switch event.kind {
 	case .Key:
 		#partial switch event.key {
-		case .Escape, .F10:
+		case .F1:
+			app.help_pending = true
+		case .F2:
+			begin_menu(app, .User)
+		case .F9:
+			begin_menu(app, .Main)
+		case .Escape:
 			panel := &app.panels[app.active_panel]
-			if event.key == .Escape && len(panel.quick_search) > 0 {
+			if len(panel.quick_search) > 0 {
 				delete(panel.quick_search)
 				panel.quick_search = ""
 				set_status(app, strings.clone(tr("Wyczyszczono szybkie wyszukiwanie")) or_else "")
-			} else {
-				app.exit_pending = true
 			}
+		case .F10:
+			app.exit_pending = true
 		case .Tab:
 			app.active_panel = 1 - app.active_panel
 		case .Up:
@@ -207,6 +226,10 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			begin_bookmarks(app)
 		} else if .Control in event.modifiers && event.text == 'q' {
 			compare_panels(app)
+		} else if .Control in event.modifiers && event.text == 'o' {
+			open_shell(ctx, app, running)
+		} else if .Control in event.modifiers && event.text == 'u' {
+			calculate_selected_size(app)
 		} else if event.modifiers == {} && len(app.panels[app.active_panel].quick_search) == 0 && (event.text == 'v' || event.text == 'V') {
 			open_selected_file(ctx, app, .View, running)
 		} else if event.modifiers == {} && len(app.panels[app.active_panel].quick_search) == 0 && (event.text == 'e' || event.text == 'E') {
@@ -215,6 +238,8 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			panel_toggle_mark(&app.panels[app.active_panel])
 		} else if event.modifiers == {} && event.text == '/' {
 			begin_filter_edit(app)
+		} else if event.modifiers == {} && event.text == ':' {
+			begin_command(app)
 		} else if event.modifiers == {} && event.text == '+' {
 			begin_mark_pattern(app, .Select)
 		} else if event.modifiers == {} && event.text == '\\' {

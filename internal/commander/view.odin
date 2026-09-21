@@ -82,12 +82,20 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		buffer,
 		0,
 		height - 1,
-		tr("F3 Podgląd F4 Edycja F5 Kopiuj F6 Przenieś F7 Utwórz F8 Usuń F10 Koniec | ^G Szukaj ^P Info ^B Zakł. ^Q Porównaj"),
+		tr("1Pomoc 2Menu 3Podgl 4Edycja 5Kopiuj 6Przen 7Utwórz 8Usuń 9Menu 10Koniec"),
 		theme.keys,
 		width,
 	)
 
-	if app.exit_pending {
+	if app.help_pending {
+		draw_help_dialog(buffer, width, height, theme)
+	} else if app.menu_kind != .None {
+		draw_menu_dialog(buffer, width, height, app, theme)
+	} else if app.command_edit_pending {
+		draw_name_edit_dialog(buffer, width, height, app.command_text, app.command_cursor,
+			tr("Polecenie powłoki"), tr("Enter Wykonaj"), theme,
+			tr("Polecenie w katalogu aktywnego panelu:"))
+	} else if app.exit_pending {
 		draw_exit_dialog(buffer, width, height, theme)
 	} else if app.create_edit_pending {
 		draw_name_edit_dialog(buffer, width, height, app.create_name, app.create_name_cursor,
@@ -107,9 +115,15 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		draw_name_edit_dialog(buffer, width, height, app.mark_pattern, app.mark_pattern_cursor,
 			title, action, theme, tr("Wzorzec (* i ?):"))
 	} else if app.search_edit_pending {
+		prompt := tr("Fragment nazwy (rekurencyjnie):")
+		hint := tr("Tab: wyszukiwanie w treści")
+		if app.search_contents {
+			prompt = tr("Tekst w plikach (rekurencyjnie):")
+			hint = tr("Tab: wyszukiwanie po nazwie")
+		}
 		draw_name_edit_dialog(buffer, width, height, app.search_query, app.search_query_cursor,
 			tr("Znajdź plik"), tr("Enter Szukaj"), theme,
-			tr("Fragment nazwy (rekurencyjnie):"))
+			prompt, hint)
 	} else if app.search_results_pending {
 		draw_search_results_dialog(buffer, width, height, app, theme)
 	} else if app.properties_pending {
@@ -190,29 +204,41 @@ draw_properties_dialog :: proc(
 	app: ^App_State,
 	theme: Theme,
 ) {
-	dialog := dialog_open(buffer, width, height, 13, tr("Właściwości"), theme)
+	dialog := dialog_open(buffer, width, height, 18, tr("Właściwości"), theme)
 	dialog_write(dialog, 1, app.property_name, .Accent)
 	path_text := fmt.aprintf(tr("Ścieżka: %s"), app.property_path)
 	type_text := fmt.aprintf(tr("Typ: %s"), app.property_kind)
 	size_buffer: [32]byte
 	size_text := fmt.aprintf(tr("Rozmiar: %s (%d bajtów)"), format_file_size(size_buffer[:], app.property_size), app.property_size)
 	modified_text := fmt.aprintf(tr("Modyfikacja: %s"), app.property_modified)
+	accessed_text := fmt.aprintf(tr("Ostatni dostęp: %s"), app.property_accessed)
+	created_text := fmt.aprintf(tr("Utworzenie: %s"), app.property_created)
+	owner_text := fmt.aprintf(tr("Właściciel: %s"), app.property_owner)
+	group_text := fmt.aprintf(tr("Grupa: %s"), app.property_group)
 	defer delete(path_text)
 	defer delete(type_text)
 	defer delete(size_text)
 	defer delete(modified_text)
+	defer delete(accessed_text)
+	defer delete(created_text)
+	defer delete(owner_text)
+	defer delete(group_text)
 	dialog_write(dialog, 3, path_text)
 	dialog_write(dialog, 4, type_text)
 	dialog_write(dialog, 5, size_text)
 	dialog_write(dialog, 6, modified_text)
-	dialog_write(dialog, 8, tr("Uprawnienia ósemkowe:"))
+	dialog_write(dialog, 7, accessed_text)
+	dialog_write(dialog, 8, created_text)
+	dialog_write(dialog, 9, owner_text)
+	dialog_write(dialog, 10, group_text)
+	dialog_write(dialog, 12, tr("Uprawnienia ósemkowe:"))
 	if app.property_is_symlink {
-		dialog_write(dialog, 9, app.property_mode, .Accent)
-		dialog_write(dialog, 10, tr("Link symboliczny: zmiana trybu jest wyłączona"))
-		dialog_write(dialog, 11, tr(" Enter/Esc Zamknij "), .Action)
+		dialog_write(dialog, 13, app.property_mode, .Accent)
+		dialog_write(dialog, 14, tr("Link symboliczny: zmiana trybu jest wyłączona"))
+		dialog_write(dialog, 16, tr(" Enter/Esc Zamknij "), .Action)
 		return
 	}
-	field := tui.Rect{x = dialog.rect.x + 27, y = dialog.rect.y + 8, width = 8, height = 1}
+	field := tui.Rect{x = dialog.rect.x + 27, y = dialog.rect.y + 12, width = 8, height = 1}
 	tui.buffer_fill(buffer, field, tui.Cell{character = ' ', style = theme.dialog_accent})
 	tui.buffer_write(buffer, field.x, field.y, app.property_mode, theme.dialog_accent, field.width)
 	cursor := clamp(app.property_mode_cursor, 0, len(app.property_mode))
@@ -221,7 +247,59 @@ draw_properties_dialog :: proc(
 		cell.style = theme.dialog_action
 		tui.buffer_set(buffer, field.x + cursor, field.y, cell)
 	}
-	dialog_write(dialog, 11, tr(" Enter Zapisz   Esc Anuluj "), .Action)
+	dialog_write(dialog, 16, tr(" Enter Zapisz   Esc Anuluj "), .Action)
+}
+
+draw_help_dialog :: proc(buffer: ^tui.Buffer, width, height: int, theme: Theme) {
+	lines := []string{
+		tr("Nawigacja"),
+		tr("  Tab / ↑↓    panel / zaznaczenie"),
+		tr("  Enter / ←→  katalog / historia"),
+		tr("Operacje na plikach"),
+		tr("  F3 / F4     podgląd / edycja"),
+		tr("  F5 / F6     kopiuj / przenieś"),
+		tr("  F7 / F8     utwórz / usuń"),
+		tr("Wyszukiwanie i informacje"),
+		tr("  Alt-F7 / ^G szukaj; Tab: nazwa / treść"),
+		tr("  ^P / ^B     właściwości / zakładki"),
+		tr("  ^Q / ^U     porównaj / oblicz rozmiar"),
+		tr("Powłoka i widok"),
+		tr("  : / ^O      polecenie / powłoka"),
+		tr("  / / ^D      filtr / pliki ukryte"),
+		tr("  ^R / ^S     odśwież / zmień sortowanie"),
+		tr("  + \\ *       oznacz / odznacz / odwróć"),
+		tr("  F10         zakończ program"),
+	}
+	dialog_height := min(len(lines) + 4, height - 2)
+	dialog := dialog_open(buffer, width, height, dialog_height, tr("Pomoc Twin Commander"), theme)
+	visible_lines := min(len(lines), max(dialog_height - 3, 0))
+	for index in 0 ..< visible_lines {
+		line := lines[index]
+		role := Dialog_Text_Role.Body
+		if index == 0 || index == 3 || index == 7 || index == 11 do role = .Accent
+		dialog_write(dialog, 1 + index, line, role)
+	}
+	dialog_write(dialog, dialog_height - 2, tr(" Enter/Esc Zamknij "), .Action)
+}
+
+draw_menu_dialog :: proc(buffer: ^tui.Buffer, width, height: int, app: ^App_State, theme: Theme) {
+	title := tr("Menu główne")
+	count := len(MAIN_MENU_ITEMS)
+	if app.menu_kind == .User {
+		title = tr("Menu użytkownika")
+		count = len(USER_MENU_ITEMS)
+	}
+	dialog_height := count + 4
+	dialog := dialog_open(buffer, width, height, dialog_height, title, theme)
+	for index in 0 ..< count {
+		item := menu_item(app.menu_kind, index)
+		style := theme.dialog_surface
+		if index == app.menu_selected do style = theme.dialog_accent
+		tui.buffer_fill(buffer, tui.Rect{x = dialog.rect.x + 2, y = dialog.rect.y + 1 + index,
+			width = dialog.rect.width - 4, height = 1}, tui.Cell{character = ' ', style = style})
+		tui.buffer_write(buffer, dialog.rect.x + 3, dialog.rect.y + 1 + index, tr(item), style, dialog.rect.width - 6)
+	}
+	dialog_write(dialog, dialog_height - 2, tr(" Enter Wybierz   Esc Zamknij "), .Action)
 }
 
 draw_bookmarks_dialog :: proc(
@@ -539,6 +617,18 @@ draw_panel :: proc(
 		}
 		tui.buffer_set(buffer, content_x, row_y, tui.Cell{character = icon, style = row_style})
 		tui.buffer_write(buffer, name_x, row_y, name, row_style, name_width)
+	}
+	if state.space_known && rect.width >= 24 {
+		free_buffer: [24]byte
+		total_buffer: [24]byte
+		space_text := fmt.aprintf(
+			tr(" wolne %s / %s "),
+			format_file_size(free_buffer[:], state.free_bytes),
+			format_file_size(total_buffer[:], state.total_bytes),
+		)
+		defer delete(space_text)
+		space_x := max(rect.x + rect.width - 2 - len(space_text), rect.x + 1)
+		tui.buffer_write(buffer, space_x, rect.y + rect.height - 1, space_text, border_style, rect.x + rect.width - 1 - space_x)
 	}
 }
 
