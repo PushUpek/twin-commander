@@ -86,3 +86,14 @@ function_keys_support_ss3_and_csi_terminal_encodings :: proc(t: ^testing.T) {
 		testing.expect_value(t, session.pending_count, 0)
 	}
 }
+
+@(test)
+alt_f7_is_parsed_for_recursive_search :: proc(t: ^testing.T) {
+	session := Session{}
+	copy(session.pending[:], "\e[18;3~")
+	session.pending_count = len("\e[18;3~")
+	event, ok := parse_pending(&session)
+	testing.expect(t, ok)
+	testing.expect_value(t, event.key, Key.F7)
+	testing.expect(t, .Alt in event.modifiers)
+}

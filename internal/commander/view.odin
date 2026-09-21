@@ -82,7 +82,7 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		buffer,
 		0,
 		height - 1,
-		tr("F3 Podgląd F4 Edycja F5 Kopiuj F6 Przenieś F7 Utwórz F8 Usuń  / Filtr  + Grupa  Ctrl-S Sortuj  F10 Koniec"),
+		tr("F3 Podgląd F4 Edycja F5 Kopiuj F6 Przenieś F7 Utwórz F8 Usuń F10 Koniec | ^G Szukaj ^P Info ^B Zakł. ^Q Porównaj"),
 		theme.keys,
 		width,
 	)
@@ -106,6 +106,16 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		}
 		draw_name_edit_dialog(buffer, width, height, app.mark_pattern, app.mark_pattern_cursor,
 			title, action, theme, tr("Wzorzec (* i ?):"))
+	} else if app.search_edit_pending {
+		draw_name_edit_dialog(buffer, width, height, app.search_query, app.search_query_cursor,
+			tr("Znajdź plik"), tr("Enter Szukaj"), theme,
+			tr("Fragment nazwy (rekurencyjnie):"))
+	} else if app.search_results_pending {
+		draw_search_results_dialog(buffer, width, height, app, theme)
+	} else if app.properties_pending {
+		draw_properties_dialog(buffer, width, height, app, theme)
+	} else if app.bookmarks_pending {
+		draw_bookmarks_dialog(buffer, width, height, app, theme)
 	} else if app.overwrite_pending {
 		if app.pending_count > 1 {
 			draw_bulk_confirmation_dialog(buffer, width, height, app.copy_name, app.pending_count, .Copy, theme)
@@ -140,6 +150,104 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	} else if app.copying {
 		draw_copy_progress_dialog(buffer, width, height, app.copy_name, app.copy_percent, theme, app.operation_label)
 	}
+}
+
+draw_search_results_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	app: ^App_State,
+	theme: Theme,
+) {
+	dialog_height := min(18, height - 2)
+	dialog := dialog_open(buffer, width, height, dialog_height, tr("Wyniki wyszukiwania"), theme)
+	count_text := fmt.aprintf(tr("Wyniki: %d dla %s"), len(app.search_results), app.search_query)
+	defer delete(count_text)
+	dialog_write(dialog, 1, count_text)
+	visible := max(dialog_height - 5, 1)
+	offset := 0
+	if app.search_selected >= visible do offset = app.search_selected - visible + 1
+	for row in 0 ..< min(visible, len(app.search_results) - offset) {
+		index := offset + row
+		path := app.search_results[index]
+		label := path
+		if strings.has_prefix(path, app.search_root) {
+			start := len(app.search_root)
+			if start < len(path) && path[start] == os.Path_Separator do start += 1
+			if start < len(path) do label = path[start:]
+		}
+		style := theme.dialog_surface
+		if index == app.search_selected do style = theme.dialog_accent
+		tui.buffer_fill(buffer, tui.Rect{x = dialog.rect.x + 2, y = dialog.rect.y + 2 + row,
+			width = dialog.rect.width - 4, height = 1}, tui.Cell{character = ' ', style = style})
+		tui.buffer_write(buffer, dialog.rect.x + 3, dialog.rect.y + 2 + row, label, style, dialog.rect.width - 6)
+	}
+	dialog_write(dialog, dialog_height - 2, tr(" Enter Otwórz   Esc Zamknij "), .Action)
+}
+
+draw_properties_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	app: ^App_State,
+	theme: Theme,
+) {
+	dialog := dialog_open(buffer, width, height, 13, tr("Właściwości"), theme)
+	dialog_write(dialog, 1, app.property_name, .Accent)
+	path_text := fmt.aprintf(tr("Ścieżka: %s"), app.property_path)
+	type_text := fmt.aprintf(tr("Typ: %s"), app.property_kind)
+	size_buffer: [32]byte
+	size_text := fmt.aprintf(tr("Rozmiar: %s (%d bajtów)"), format_file_size(size_buffer[:], app.property_size), app.property_size)
+	modified_text := fmt.aprintf(tr("Modyfikacja: %s"), app.property_modified)
+	defer delete(path_text)
+	defer delete(type_text)
+	defer delete(size_text)
+	defer delete(modified_text)
+	dialog_write(dialog, 3, path_text)
+	dialog_write(dialog, 4, type_text)
+	dialog_write(dialog, 5, size_text)
+	dialog_write(dialog, 6, modified_text)
+	dialog_write(dialog, 8, tr("Uprawnienia ósemkowe:"))
+	if app.property_is_symlink {
+		dialog_write(dialog, 9, app.property_mode, .Accent)
+		dialog_write(dialog, 10, tr("Link symboliczny: zmiana trybu jest wyłączona"))
+		dialog_write(dialog, 11, tr(" Enter/Esc Zamknij "), .Action)
+		return
+	}
+	field := tui.Rect{x = dialog.rect.x + 27, y = dialog.rect.y + 8, width = 8, height = 1}
+	tui.buffer_fill(buffer, field, tui.Cell{character = ' ', style = theme.dialog_accent})
+	tui.buffer_write(buffer, field.x, field.y, app.property_mode, theme.dialog_accent, field.width)
+	cursor := clamp(app.property_mode_cursor, 0, len(app.property_mode))
+	if cursor < field.width {
+		cell := tui.buffer_get(buffer, field.x + cursor, field.y)
+		cell.style = theme.dialog_action
+		tui.buffer_set(buffer, field.x + cursor, field.y, cell)
+	}
+	dialog_write(dialog, 11, tr(" Enter Zapisz   Esc Anuluj "), .Action)
+}
+
+draw_bookmarks_dialog :: proc(
+	buffer: ^tui.Buffer,
+	width, height: int,
+	app: ^App_State,
+	theme: Theme,
+) {
+	dialog_height := min(16, height - 2)
+	dialog := dialog_open(buffer, width, height, dialog_height, tr("Zakładki katalogów"), theme)
+	visible := max(dialog_height - 4, 1)
+	offset := 0
+	if app.bookmark_selected >= visible do offset = app.bookmark_selected - visible + 1
+	if len(app.bookmarks) == 0 {
+		dialog_write(dialog, 2, tr("Brak zakładek. Naciśnij A, aby dodać bieżący katalog."))
+	}
+	for row in 0 ..< min(visible, len(app.bookmarks) - offset) {
+		index := offset + row
+		style := theme.dialog_surface
+		if index == app.bookmark_selected do style = theme.dialog_accent
+		tui.buffer_fill(buffer, tui.Rect{x = dialog.rect.x + 2, y = dialog.rect.y + 1 + row,
+			width = dialog.rect.width - 4, height = 1}, tui.Cell{character = ' ', style = style})
+		tui.buffer_write(buffer, dialog.rect.x + 3, dialog.rect.y + 1 + row,
+			app.bookmarks[index], style, dialog.rect.width - 6)
+	}
+	dialog_write(dialog, dialog_height - 2, tr(" A Dodaj   D Usuń   Enter Otwórz   Esc Zamknij "), .Action)
 }
 
 draw_exit_dialog :: proc(buffer: ^tui.Buffer, width, height: int, theme: Theme) {
