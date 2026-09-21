@@ -52,6 +52,7 @@ panel_load :: proc(panel: ^Panel_State, path: string, record_history := true) ->
 	if !same_path do panel_clear_marks(panel)
 	panel.path = absolute_path
 	panel.files = files
+	update_panel_space(panel)
 	panel.selected = 0
 	panel.offset = 0
 	if same_path {

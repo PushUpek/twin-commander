@@ -38,23 +38,31 @@ Obsługiwane klawisze:
 - `Ctrl-D` — pokazanie lub ukrycie plików zaczynających się od kropki,
 - `Ctrl-S` — następny sposób sortowania: nazwa, rozszerzenie, rozmiar, data modyfikacji; kolejny cykl odwraca kierunek,
 - `Ctrl-R` — odświeżenie panelu z zachowaniem kursora i istniejących oznaczeń,
-- `Alt-F7` lub `Ctrl-G` — rekurencyjne wyszukiwanie po fragmencie nazwy od katalogu aktywnego panelu; `Enter` na wyniku przechodzi do elementu,
-- `Ctrl-P` — właściwości wybranego elementu i zmiana uprawnień w zapisie ósemkowym (`000`–`777`); dla symlinków właściwości są tylko do odczytu,
-- `Ctrl-B` — zakładki katalogów; `A` dodaje bieżący katalog, `D` usuwa zakładkę, a `Enter` ją otwiera,
+- `Alt-F7` lub `Ctrl-G` — rekurencyjne wyszukiwanie od katalogu aktywnego panelu; `Tab` w dialogu przełącza wyszukiwanie po nazwie i w treści plików, a `Enter` na wyniku przechodzi do elementu,
+- `Ctrl-P` — właściwości wybranego elementu: typ, rozmiar, właściciel, grupa, daty i uprawnienia; tryb można zmienić w zapisie ósemkowym (`000`–`777`), a dla symlinków właściwości są tylko do odczytu,
+- `Ctrl-B` — trwałe zakładki katalogów; `A` dodaje bieżący katalog, `D` usuwa zakładkę, a `Enter` ją otwiera,
 - `Ctrl-Q` — porównanie obu paneli i oznaczenie elementów brakujących lub różniących się typem, rozmiarem albo datą modyfikacji,
+- `Ctrl-U` — rekurencyjne obliczenie rozmiaru zaznaczonego katalogu; wolne i całkowite miejsce systemu plików jest widoczne na dolnej krawędzi każdego panelu,
+- `:` — wykonanie polecenia przez `$SHELL` w katalogu aktywnego panelu,
+- `Ctrl-O` — otwarcie interaktywnej powłoki w katalogu aktywnego panelu,
+- `F1` — pomoc klawiaturowa, `F2` — menu użytkownika, `F9` — menu główne,
 - `F3` lub `v` — otwarcie zaznaczonego pliku tylko do odczytu w zewnętrznym pagerze (`$PAGER`, domyślnie `less`),
 - `F4` lub `e` — otwarcie zaznaczonego pliku w zewnętrznym edytorze (`$VISUAL`, następnie `$EDITOR`, domyślnie `vi`),
 - `F5` — skopiowanie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu; dla pojedynczego elementu pozwala ustawić nazwę kopii,
 - `F6` — przeniesienie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu; dla pojedynczego elementu pozwala też zmienić nazwę docelową,
 - `F7` — tworzenie w aktywnym panelu: nazwa bez `/` tworzy pusty plik, z `/` katalog wraz z brakującymi katalogami nadrzędnymi (`mkdir -p`); istniejące pliki nie są nadpisywane,
 - `F8` — usunięcie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) po potwierdzeniu,
-- `Esc` lub `F10` — otwarcie dialogu potwierdzenia zakończenia programu.
+- `F10` — otwarcie dialogu potwierdzenia zakończenia programu; `Esc` anuluje dialogi i operacje, ale nie zamyka programu.
 - `Ctrl-C` — natychmiastowe zakończenie programu.
 
 Na czas podglądu lub edycji Twin Commander oddaje zewnętrznemu programowi zwykły
 terminal. Po zamknięciu programu wraca do interfejsu i po edycji odświeża aktywny
 panel. Zmienne `PAGER`, `VISUAL` i `EDITOR` mogą zawierać również argumenty, np.
 `EDITOR="code --wait"`.
+
+Polecenia uruchamiane przez `:` pokazują zwykłe wyjście terminala oraz kod
+zakończenia. Twin Commander czeka na `Enter`, dzięki czemu wynik nie znika przed
+powrotem do paneli. Kod zakończenia pozostaje następnie widoczny na pasku stanu.
 
 Podczas kopiowania pływające okno pokazuje procentowy postęp operacji. Jeśli element
 o tej samej nazwie już istnieje w panelu docelowym, program najpierw poprosi o
@@ -67,8 +75,10 @@ przerwać klawiszem `Esc` lub `Ctrl-C`. Błąd operacji pozwala ponowić bieżą
 element, pominąć go albo przerwać cały zestaw. Linki symboliczne są kopiowane,
 przenoszone i usuwane jako linki, bez modyfikowania wskazywanego przez nie celu.
 Wyszukiwanie obejmuje podkatalogi i respektuje ustawienie widoczności plików
-ukrytych; lista jest ograniczona do 5000 wyników. Zakładki istnieją w ramach
-bieżącej sesji programu. Porównanie paneli działa na ich bieżącej, nierozwijanej
+ukrytych; lista jest ograniczona do 5000 wyników, a wyszukiwanie treści pomija
+pliki binarne i pliki większe niż 8 MiB. Zakładki są zapisywane w katalogu
+konfiguracji użytkownika; ścieżkę można nadpisać zmienną
+`TWIN_COMMANDER_BOOKMARKS_FILE`. Porównanie paneli działa na ich bieżącej, nierozwijanej
 rekurencyjnie zawartości; katalogi o tej samej nazwie i typie są uznawane za zgodne.
 
 Interfejs ma dwa odrębne szablony kolorystyczne: Kanso Pearl dla trybu jasnego
