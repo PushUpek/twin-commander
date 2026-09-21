@@ -206,6 +206,11 @@ scaled_hex :: proc(value: []u8) -> (int, bool) {
 }
 
 parse_escape :: proc(data: []u8) -> (Event, int, bool) {
+	alt_f7_text: string = "\e[18;3~"
+	alt_f7 := transmute([]u8)alt_f7_text
+	if len(data) >= len(alt_f7) && bytes.equal(data[:len(alt_f7)], alt_f7) {
+		return Event{kind = .Key, key = .F7, modifiers = {.Alt}}, len(alt_f7), true
+	}
 	sequences := []struct {
 		sequence: string,
 		key:      Key,

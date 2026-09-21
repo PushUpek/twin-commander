@@ -46,6 +46,25 @@ App_State :: struct {
 	mark_mode: Mark_Mode,
 	mark_pattern: string,
 	mark_pattern_cursor: int,
+	search_edit_pending: bool,
+	search_results_pending: bool,
+	search_query: string,
+	search_query_cursor: int,
+	search_root: string,
+	search_results: [dynamic]string,
+	search_selected: int,
+	properties_pending: bool,
+	property_path: string,
+	property_name: string,
+	property_kind: string,
+	property_modified: string,
+	property_size: i64,
+	property_mode: string,
+	property_mode_cursor: int,
+	property_is_symlink: bool,
+	bookmarks_pending: bool,
+	bookmarks: [dynamic]string,
+	bookmark_selected: int,
 	copying:           bool,
 	copy_name:         string,
 	copy_target_name:  string,
@@ -69,6 +88,17 @@ app_destroy :: proc(app: ^App_State) {
 	delete(app.create_name)
 	delete(app.filter_text)
 	delete(app.mark_pattern)
+	delete(app.search_query)
+	delete(app.search_root)
+	for path in app.search_results do delete(path)
+	delete(app.search_results)
+	delete(app.property_path)
+	delete(app.property_name)
+	delete(app.property_kind)
+	delete(app.property_modified)
+	delete(app.property_mode)
+	for path in app.bookmarks do delete(path)
+	delete(app.bookmarks)
 	delete(app.operation_label)
 }
 
