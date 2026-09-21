@@ -7,6 +7,7 @@ import "core:strings"
 import "tc:internal/tui"
 
 MAX_SEARCH_RESULTS :: 5000
+MAX_CONTENT_SEARCH_SIZE :: 8 * 1024 * 1024
 
 begin_search :: proc(app: ^App_State) {
 	clear_edit_name(&app.search_query, &app.search_query_cursor)
@@ -14,13 +15,17 @@ begin_search :: proc(app: ^App_State) {
 }
 
 handle_search_edit_event :: proc(app: ^App_State, event: tui.Event) {
+	if event.kind == .Key && event.key == .Tab {
+		app.search_contents = !app.search_contents
+		return
+	}
 	switch handle_name_edit_input(&app.search_query, &app.search_query_cursor, event, true) {
 	case .Cancel:
 		app.search_edit_pending = false
 		set_status(app, strings.clone(tr("Anulowano wyszukiwanie")) or_else "")
 	case .Submit:
 		if len(strings.trim_space(app.search_query)) == 0 {
-			set_status(app, strings.clone(tr("Podaj fragment nazwy")) or_else "")
+			set_status(app, strings.clone(tr("Podaj szukany tekst")) or_else "")
 			return
 		}
 		app.search_edit_pending = false
@@ -52,8 +57,14 @@ run_search :: proc(app: ^App_State) {
 			if info.type == .Directory do os.walker_skip_dir(&walker)
 			continue
 		}
-		name := strings.to_lower(info.name, context.temp_allocator) or_else info.name
-		if strings.contains(name, needle) {
+		matched := false
+		if app.search_contents {
+			matched = info.type == .Regular && info.size <= MAX_CONTENT_SEARCH_SIZE && file_contains_text(info.fullpath, needle)
+		} else {
+			name := strings.to_lower(info.name, context.temp_allocator) or_else info.name
+			matched = strings.contains(name, needle)
+		}
+		if matched {
 			append(&app.search_results, strings.clone(info.fullpath) or_else "")
 		}
 		if len(app.search_results) >= MAX_SEARCH_RESULTS do break
@@ -66,6 +77,16 @@ run_search :: proc(app: ^App_State) {
 	} else {
 		set_status(app, fmt.aprintf(tr("Znaleziono %d wyników"), len(app.search_results)))
 	}
+}
+
+file_contains_text :: proc(path, needle: string) -> bool {
+	data, err := os.read_entire_file(path, context.temp_allocator)
+	if err != nil do return false
+	for byte in data {
+		if byte == 0 do return false
+	}
+	contents := strings.to_lower(string(data), context.temp_allocator) or_else string(data)
+	return strings.contains(contents, needle)
 }
 
 handle_search_results_event :: proc(app: ^App_State, event: tui.Event) {
