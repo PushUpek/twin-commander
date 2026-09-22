@@ -108,11 +108,15 @@ handle_mark_edit_event :: proc(app: ^App_State, event: tui.Event) {
 
 navigate_parent :: proc(app: ^App_State) {
 	panel := &app.panels[app.active_panel]
+	if leave_archive(panel) {
+		set_status(app, fmt.aprintf(tr("Katalog: %s"), panel.path))
+		return
+	}
 	child_name := strings.clone(filepath.base(panel.path)) or_else ""
 	defer delete(child_name)
 	target := filepath.join({panel.path, ".."}) or_else ""
 	defer delete(target)
-	if err := panel_load(panel, target); err != nil {
+	if err := panel_load(panel, target, !panel_is_archive(panel)); err != nil {
 		set_status(app, fmt.aprintf(tr("Nie można wejść do katalogu: %s"), os.error_string(err)))
 	} else {
 		panel_select_name(panel, child_name)
@@ -122,6 +126,10 @@ navigate_parent :: proc(app: ^App_State) {
 
 navigate_history :: proc(app: ^App_State, delta: int) {
 	panel := &app.panels[app.active_panel]
+	if panel_is_archive(panel) {
+		set_status(app, strings.clone(tr("Historia katalogów jest wyłączona w archiwum")) or_else "")
+		return
+	}
 	old_index := panel.history_index
 	if err := panel_history_move(panel, delta); err != nil {
 		set_status(app, fmt.aprintf(tr("Nie można otworzyć katalogu z historii: %s"), os.error_string(err)))
