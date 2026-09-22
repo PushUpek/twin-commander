@@ -111,6 +111,10 @@ copy_entries :: proc(app: ^App_State) -> ([dynamic]os.File_Info, bool) {
 
 copy_destination :: proc(app: ^App_State, file: os.File_Info, target_name: string) -> (string, bool) {
 	destination_panel := &app.panels[1 - app.active_panel]
+	if panel_is_archive(destination_panel) {
+		archive_read_only_status(app)
+		return "", false
+	}
 	name := file.name
 	if len(target_name) > 0 do name = target_name
 	destination_path := filepath.join({destination_panel.path, name}) or_else ""

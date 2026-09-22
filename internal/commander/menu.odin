@@ -2,21 +2,27 @@ package commander
 
 import "tc:internal/tui"
 
-USER_MENU_ITEMS: [6]string = {
+USER_MENU_ITEMS: [8]string = {
 	"Wykonaj polecenie",
 	"Otwórz powłokę",
+	"Kopiuj w tle",
+	"Kolejka operacji",
 	"Oblicz rozmiar",
 	"Właściwości",
 	"Zakładki",
 	"Wyszukiwanie",
 }
 
-MAIN_MENU_ITEMS: [8]string = {
+MAIN_MENU_ITEMS: [12]string = {
 	"Wyszukiwanie",
 	"Zakładki",
 	"Porównaj panele",
 	"Właściwości",
 	"Oblicz rozmiar",
+	"Utwórz link",
+	"Suma SHA-256",
+	"Kopiuj w tle",
+	"Kolejka operacji",
 	"Wykonaj polecenie",
 	"Otwórz powłokę",
 	"Pomoc",
@@ -51,10 +57,12 @@ activate_menu_item :: proc(ctx: ^tui.Context, app: ^App_State, running: ^bool, k
 		switch selection {
 		case 0: begin_command(app)
 		case 1: open_shell(ctx, app, running)
-		case 2: calculate_selected_size(app)
-		case 3: begin_properties(app)
-		case 4: begin_bookmarks(app)
-		case 5: begin_search(app)
+		case 2: enqueue_copy_jobs(app)
+		case 3: begin_background_jobs(app)
+		case 4: calculate_selected_size(app)
+		case 5: begin_properties(app)
+		case 6: begin_bookmarks(app)
+		case 7: begin_search(app)
 		}
 		return
 	}
@@ -64,9 +72,13 @@ activate_menu_item :: proc(ctx: ^tui.Context, app: ^App_State, running: ^bool, k
 	case 2: compare_panels(app)
 	case 3: begin_properties(app)
 	case 4: calculate_selected_size(app)
-	case 5: begin_command(app)
-	case 6: open_shell(ctx, app, running)
-	case 7: app.help_pending = true
+	case 5: begin_link(app)
+	case 6: begin_checksum(app)
+	case 7: enqueue_copy_jobs(app)
+	case 8: begin_background_jobs(app)
+	case 9: begin_command(app)
+	case 10: open_shell(ctx, app, running)
+	case 11: app.help_pending = true
 	}
 }
 

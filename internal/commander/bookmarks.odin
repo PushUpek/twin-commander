@@ -114,7 +114,12 @@ remove_selected_bookmark :: proc(app: ^App_State) -> bool {
 open_selected_bookmark :: proc(app: ^App_State) {
 	if app.bookmark_selected < 0 || app.bookmark_selected >= len(app.bookmarks) do return
 	path := app.bookmarks[app.bookmark_selected]
-	if err := panel_load(&app.panels[app.active_panel], path); err != nil {
+	panel := &app.panels[app.active_panel]
+	if panel_is_archive(panel) && !close_archive(panel) {
+		set_status(app, strings.clone(tr("Nie można zamknąć widoku archiwum")) or_else "")
+		return
+	}
+	if err := panel_load(panel, path); err != nil {
 		set_status(app, fmt.aprintf(tr("Nie można otworzyć zakładki: %s"), path))
 		return
 	}
