@@ -233,6 +233,8 @@
   "hex": "hex",
   " Tryb: %s | [F4/H] przełącz | [F7 lub /] szukaj | [N] następny | [F3/Esc] zamknij ": " Mode: %s | [F4/H] toggle | [F7 or /] search | [N] next | [F3/Esc] close ",
   " %s | [F4/H] tryb | [/] szukaj | [N] dalej | [Esc] zamknij ": " %s | [F4/H] mode | [/] search | [N] next | [Esc] close ",
+  " %s | [H] tryb | [/] szukaj | [Esc] zamknij ": " %s | [H] mode | [/] search | [Esc] close ",
+  "[Esc] zamknij": "[Esc] close",
   "Szukaj w podglądzie": "Search in viewer",
   "Tekst:": "Text:",
   "Podaj nazwę linku bez separatora katalogów": "Enter a link name without path separators",

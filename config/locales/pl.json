@@ -233,6 +233,8 @@
   "hex": "hex",
   " Tryb: %s | [F4/H] przełącz | [F7 lub /] szukaj | [N] następny | [F3/Esc] zamknij ": " Tryb: %s | [F4/H] przełącz | [F7 lub /] szukaj | [N] następny | [F3/Esc] zamknij ",
   " %s | [F4/H] tryb | [/] szukaj | [N] dalej | [Esc] zamknij ": " %s | [F4/H] tryb | [/] szukaj | [N] dalej | [Esc] zamknij ",
+  " %s | [H] tryb | [/] szukaj | [Esc] zamknij ": " %s | [H] tryb | [/] szukaj | [Esc] zamknij ",
+  "[Esc] zamknij": "[Esc] zamknij",
   "Szukaj w podglądzie": "Szukaj w podglądzie",
   "Tekst:": "Tekst:",
   "Podaj nazwę linku bez separatora katalogów": "Podaj nazwę linku bez separatora katalogów",
