@@ -22,6 +22,7 @@ Run :: proc() {
 		fmt.eprintln(tr("Nie można wczytać motywu z katalogu config/themes"))
 		return
 	}
+	associations_load(&app)
 	last_system_theme_check := time.tick_now()
 
 	ui_context: tui.Context
@@ -56,6 +57,7 @@ Run :: proc() {
 
 	running := true
 	for running {
+		background_tick(&app)
 		if !app.theme_overridden && time.tick_since(last_system_theme_check) >= 2 * time.Second {
 			if mode, ok := system_theme_mode(); ok {
 				set_theme_mode(&app, mode)
@@ -67,7 +69,9 @@ Run :: proc() {
 			break
 		}
 
-		event, ok := tui.poll_event(&ui_context)
+		timeout_ms := -1
+		if background_has_active_job(&app) do timeout_ms = 100
+		event, ok := tui.poll_event(&ui_context, timeout_ms)
 		if !ok {
 			continue
 		}
@@ -95,6 +99,22 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 	}
 	if app.command_edit_pending {
 		handle_command_event(ctx, app, event, running)
+		return
+	}
+	if app.viewer_pending {
+		handle_viewer_event(ctx, app, event)
+		return
+	}
+	if app.link_edit_pending {
+		handle_link_event(app, event)
+		return
+	}
+	if app.checksum_pending {
+		handle_checksum_event(app, event)
+		return
+	}
+	if app.background_pending {
+		handle_background_event(app, event)
 		return
 	}
 	if app.create_edit_pending {
@@ -161,6 +181,8 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 				delete(panel.quick_search)
 				panel.quick_search = ""
 				set_status(app, strings.clone(tr("Wyczyszczono szybkie wyszukiwanie")) or_else "")
+			} else {
+				app.exit_pending = true
 			}
 		case .F10:
 			app.exit_pending = true
@@ -189,23 +211,28 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 				navigate_parent(app)
 			}
 		case .Enter:
-			enter_selected_directory(app)
+			activate_selected(ctx, app, running)
 		case .F3:
-			open_selected_file(ctx, app, .View, running)
+			begin_viewer(app)
 		case .F4:
-			open_selected_file(ctx, app, .Edit, running)
+			if panel_is_archive(&app.panels[app.active_panel]) do archive_read_only_status(app)
+			else do open_selected_file(ctx, app, .Edit, running)
 		case .F5:
 			copy_selected_file(ctx, app)
 		case .F6:
-			move_selected_entry(app, ctx)
+			if panel_is_archive(&app.panels[app.active_panel]) do archive_read_only_status(app)
+			else do move_selected_entry(app, ctx)
 		case .F7:
 			if .Alt in event.modifiers {
 				begin_search(app)
+			} else if panel_is_archive(&app.panels[app.active_panel]) {
+				archive_read_only_status(app)
 			} else {
 				begin_create_entry(app)
 			}
 		case .F8:
-			delete_selected_entry(app)
+			if panel_is_archive(&app.panels[app.active_panel]) do archive_read_only_status(app)
+			else do delete_selected_entry(app)
 		}
 	case .Text:
 		if .Control in event.modifiers && event.text == 'c' {
@@ -230,10 +257,19 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			open_shell(ctx, app, running)
 		} else if .Control in event.modifiers && event.text == 'u' {
 			calculate_selected_size(app)
+		} else if .Control in event.modifiers && event.text == 'l' {
+			begin_link(app)
+		} else if .Control in event.modifiers && event.text == 'k' {
+			begin_checksum(app)
+		} else if .Control in event.modifiers && event.text == 'j' {
+			enqueue_copy_jobs(app)
+		} else if .Control in event.modifiers && event.text == 't' {
+			begin_background_jobs(app)
 		} else if event.modifiers == {} && len(app.panels[app.active_panel].quick_search) == 0 && (event.text == 'v' || event.text == 'V') {
-			open_selected_file(ctx, app, .View, running)
+			begin_viewer(app)
 		} else if event.modifiers == {} && len(app.panels[app.active_panel].quick_search) == 0 && (event.text == 'e' || event.text == 'E') {
-			open_selected_file(ctx, app, .Edit, running)
+			if panel_is_archive(&app.panels[app.active_panel]) do archive_read_only_status(app)
+			else do open_selected_file(ctx, app, .Edit, running)
 		} else if event.text == ' ' {
 			panel_toggle_mark(&app.panels[app.active_panel])
 		} else if event.modifiers == {} && event.text == '/' {
@@ -255,6 +291,31 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 				set_status(app, fmt.aprintf(tr("Brak nazwy zaczynającej się od: %s"), panel.quick_search))
 			}
 		}
+	}
+}
+
+activate_selected :: proc(ctx: ^tui.Context, app: ^App_State, running: ^bool) {
+	panel := &app.panels[app.active_panel]
+	if panel.selected == 0 {
+		enter_selected_directory(app)
+		return
+	}
+	if panel.selected > len(panel.files) do return
+	file := panel.files[panel.selected - 1]
+	is_directory := file.type == .Directory
+	if file.type == .Symlink {
+		followed, err := os.stat(file.fullpath, context.temp_allocator)
+		if err == nil {
+			is_directory = followed.type == .Directory
+			os.file_info_delete(followed, context.temp_allocator)
+		}
+	}
+	if is_directory {
+		enter_selected_directory(app)
+	} else if open_archive(app, file.fullpath) {
+		return
+	} else if !open_associated_file(ctx, app, file.fullpath, running) {
+		begin_viewer(app)
 	}
 }
 
@@ -302,6 +363,10 @@ enter_selected_directory :: proc(app: ^App_State) {
 	panel := &app.panels[app.active_panel]
 	target: string
 	if panel.selected == 0 {
+		if leave_archive(panel) {
+			set_status(app, fmt.aprintf(tr("Katalog: %s"), panel.path))
+			return
+		}
 		target = filepath.join({panel.path, ".."}) or_else ""
 	} else {
 		file := panel.files[panel.selected - 1]
@@ -325,7 +390,7 @@ enter_selected_directory :: proc(app: ^App_State) {
 		set_status(app, strings.clone(tr("Nie udało się zbudować ścieżki")) or_else "")
 		return
 	}
-	if err := panel_load(panel, target); err != nil {
+	if err := panel_load(panel, target, !panel_is_archive(panel)); err != nil {
 		set_status(app, fmt.aprintf(tr("Nie można wejść do katalogu: %s"), os.error_string(err)))
 		return
 	}

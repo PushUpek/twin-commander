@@ -82,12 +82,25 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 		buffer,
 		0,
 		height - 1,
-		tr("1Pomoc 2Menu 3Podgl 4Edycja 5Kopiuj 6Przen 7Utwórz 8Usuń 9Menu 10Koniec"),
+		footer_labels(width),
 		theme.keys,
 		width,
 	)
 
-	if app.help_pending {
+	if app.viewer_pending {
+		draw_viewer(buffer, width, height, app, theme)
+	} else if app.link_edit_pending {
+		kind := tr("symboliczny")
+		if app.link_hard do kind = tr("twardy")
+		hint := fmt.aprintf(tr("Typ: %s (Tab przełącza); cel: drugi panel"), kind)
+		defer delete(hint)
+		draw_name_edit_dialog(buffer, width, height, app.link_name, app.link_name_cursor,
+			tr("Utwórz link"), tr("Enter Utwórz"), theme, tr("Nazwa linku:"), hint)
+	} else if app.checksum_pending {
+		draw_checksum_dialog(buffer, width, height, app, theme)
+	} else if app.background_pending {
+		draw_background_dialog(buffer, width, height, app, theme)
+	} else if app.help_pending {
 		draw_help_dialog(buffer, width, height, theme)
 	} else if app.menu_kind != .None {
 		draw_menu_dialog(buffer, width, height, app, theme)
@@ -164,6 +177,14 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	} else if app.copying {
 		draw_copy_progress_dialog(buffer, width, height, app.copy_name, app.copy_percent, theme, app.operation_label)
 	}
+}
+
+footer_labels :: proc(width: int) -> string {
+	full := tr("[F1] Pomoc  [F2] Menu użytkownika  [F3] Podgląd  [F4] Edycja  [F5] Kopiuj  [F6] Przenieś  [F7] Utwórz  [F8] Usuń  [F9] Menu główne  [Esc/F10] Koniec")
+	if strings.rune_count(full) <= width do return full
+	compact := tr("[F1] Pom  [F2] Menu użytkownika  [F3] Podgl  [F4] Edyt  [F5] Kop  [F6] Przen  [F7] Utw  [F8] Usuń  [F9] Menu główne  [Esc] Wyjdź")
+	if strings.rune_count(compact) <= width do return compact
+	return tr("[F1] Pomoc  [F2] Menu użytkownika  [F3] Podgl.  [F9] Menu główne  [Esc] Wyjdź")
 }
 
 draw_search_results_dialog :: proc(
@@ -263,12 +284,14 @@ draw_help_dialog :: proc(buffer: ^tui.Buffer, width, height: int, theme: Theme) 
 		tr("  Alt-F7 / ^G szukaj; Tab: nazwa / treść"),
 		tr("  ^P / ^B     właściwości / zakładki"),
 		tr("  ^Q / ^U     porównaj / oblicz rozmiar"),
+		tr("  ^K / ^L     suma SHA-256 / utwórz link"),
 		tr("Powłoka i widok"),
 		tr("  : / ^O      polecenie / powłoka"),
+		tr("  ^J / ^T     kopiuj w tle / kolejka"),
 		tr("  / / ^D      filtr / pliki ukryte"),
 		tr("  ^R / ^S     odśwież / zmień sortowanie"),
 		tr("  + \\ *       oznacz / odznacz / odwróć"),
-		tr("  F10         zakończ program"),
+		tr("  Esc / F10   zakończ program"),
 	}
 	dialog_height := min(len(lines) + 4, height - 2)
 	dialog := dialog_open(buffer, width, height, dialog_height, tr("Pomoc Twin Commander"), theme)
@@ -276,7 +299,7 @@ draw_help_dialog :: proc(buffer: ^tui.Buffer, width, height: int, theme: Theme) 
 	for index in 0 ..< visible_lines {
 		line := lines[index]
 		role := Dialog_Text_Role.Body
-		if index == 0 || index == 3 || index == 7 || index == 11 do role = .Accent
+		if index == 0 || index == 3 || index == 7 || index == 12 do role = .Accent
 		dialog_write(dialog, 1 + index, line, role)
 	}
 	dialog_write(dialog, dialog_height - 2, tr(" Enter/Esc Zamknij "), .Action)

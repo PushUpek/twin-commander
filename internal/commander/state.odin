@@ -1,6 +1,7 @@
 package commander
 
 import "core:os"
+import "core:thread"
 import "tc:internal/fsops"
 
 Mark_Mode :: enum {
@@ -12,6 +13,31 @@ Menu_Kind :: enum {
 	None,
 	User,
 	Main,
+}
+
+File_Association :: struct {
+	extension: string,
+	command: string,
+}
+
+Background_Job_State :: enum i32 {
+	Queued,
+	Running,
+	Paused,
+	Done,
+	Failed,
+	Cancelled,
+}
+
+Background_Job :: struct {
+	source: string,
+	destination: string,
+	name: string,
+	percent: i32,
+	state: i32,
+	pause_requested: i32,
+	cancel_requested: i32,
+	worker: ^thread.Thread,
 }
 
 Panel_State :: struct {
@@ -30,6 +56,9 @@ Panel_State :: struct {
 	free_bytes: i64,
 	total_bytes: i64,
 	space_known: bool,
+	archive_root: string,
+	archive_source: string,
+	archive_parent: string,
 }
 
 App_State :: struct {
@@ -86,6 +115,30 @@ App_State :: struct {
 	help_pending: bool,
 	menu_kind: Menu_Kind,
 	menu_selected: int,
+	viewer_pending: bool,
+	viewer_search_edit_pending: bool,
+	viewer_path: string,
+	viewer_data: []byte,
+	viewer_line_starts: [dynamic]int,
+	viewer_top: int,
+	viewer_hex: bool,
+	viewer_query: string,
+	viewer_query_cursor: int,
+	link_edit_pending: bool,
+	link_hard: bool,
+	link_source: string,
+	link_name: string,
+	link_name_cursor: int,
+	checksum_pending: bool,
+	checksum_path: string,
+	checksum_hash: string,
+	checksum_other_path: string,
+	checksum_other_hash: string,
+	checksum_equal: bool,
+	associations: [dynamic]File_Association,
+	background_jobs: [dynamic]^Background_Job,
+	background_pending: bool,
+	background_selected: int,
 	copying:           bool,
 	copy_name:         string,
 	copy_target_name:  string,
@@ -99,6 +152,7 @@ App_State :: struct {
 }
 
 app_destroy :: proc(app: ^App_State) {
+	background_destroy(app)
 	for index in 0 ..< len(app.panels) {
 		panel_destroy(&app.panels[index])
 	}
@@ -126,6 +180,21 @@ app_destroy :: proc(app: ^App_State) {
 	delete(app.bookmarks)
 	delete(app.bookmarks_file)
 	delete(app.command_text)
+	delete(app.viewer_path)
+	delete(app.viewer_data)
+	delete(app.viewer_line_starts)
+	delete(app.viewer_query)
+	delete(app.link_source)
+	delete(app.link_name)
+	delete(app.checksum_path)
+	delete(app.checksum_hash)
+	delete(app.checksum_other_path)
+	delete(app.checksum_other_hash)
+	for association in app.associations {
+		delete(association.extension)
+		delete(association.command)
+	}
+	delete(app.associations)
 	delete(app.operation_label)
 }
 

@@ -1,5 +1,6 @@
 package commander
 
+import "core:strings"
 import "tc:internal/tui"
 
 Dialog_Text_Role :: enum {
@@ -19,6 +20,7 @@ dialog_open :: proc(
 	screen_width, screen_height, height: int,
 	title: string,
 	theme: Theme,
+	max_width := 60,
 ) -> Dialog_Template {
 	// Przygaszenie istniejącej zawartości oddziela modal od obu paneli bez
 	// polegania na konkretnym odwzorowaniu kolorów ANSI przez terminal.
@@ -30,7 +32,7 @@ dialog_open :: proc(
 		}
 	}
 
-	dialog_width := min(60, screen_width - 4)
+	dialog_width := min(max_width, screen_width - 4)
 	rect := tui.Rect {
 		x      = (screen_width - dialog_width) / 2,
 		y      = (screen_height - height) / 2,
@@ -50,6 +52,13 @@ dialog_write :: proc(
 	text: string,
 	role := Dialog_Text_Role.Body,
 ) {
+	rendered := text
+	formatted := ""
+	if role == .Action {
+		formatted = format_action_hints(text)
+		rendered = formatted
+	}
+	defer delete(formatted)
 	style := dialog.theme.dialog_surface
 	switch role {
 	case .Accent:
@@ -62,10 +71,33 @@ dialog_write :: proc(
 		dialog.buffer,
 		dialog.rect.x + 3,
 		dialog.rect.y + row,
-		text,
+		rendered,
 		style,
 		dialog.rect.width - 6,
 	)
+}
+
+format_action_hints :: proc(text: string) -> string {
+	builder := strings.builder_make()
+	defer strings.builder_destroy(&builder)
+	remaining := strings.trim_space(text)
+	first := true
+	for part in strings.split_iterator(&remaining, "  ") {
+		trimmed_part := strings.trim_space(part)
+		if len(trimmed_part) == 0 do continue
+		if !first do strings.write_string(&builder, "  ")
+		first = false
+		space := strings.index_byte(trimmed_part, ' ')
+		if space < 0 {
+			strings.write_string(&builder, trimmed_part)
+			continue
+		}
+		strings.write_string(&builder, "[")
+		strings.write_string(&builder, trimmed_part[:space])
+		strings.write_string(&builder, "] ")
+		strings.write_string(&builder, trimmed_part[space + 1:])
+	}
+	return strings.clone(strings.to_string(builder)) or_else ""
 }
 
 dialog_progress :: proc(dialog: Dialog_Template, row, percent: int) {

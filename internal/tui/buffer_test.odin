@@ -1,5 +1,7 @@
 package tui
 
+import "core:strings"
+
 @(test)
 buffer_clips_text :: proc(t: ^testing.T) {
 	buffer: Buffer
@@ -21,6 +23,33 @@ buffer_clips_rectangles :: proc(t: ^testing.T) {
 	testing.expect_value(t, buffer_get(&buffer, 0, 0).character, rune('#'))
 	testing.expect_value(t, buffer_get(&buffer, 1, 1).character, rune('#'))
 	testing.expect_value(t, buffer_get(&buffer, 2, 2).character, rune(' '))
+}
+
+@(test)
+renderer_repositions_after_unicode_and_escapes_control :: proc(t: ^testing.T) {
+	screen: Screen
+	screen_init(&screen, 8, 1)
+	defer screen_destroy(&screen)
+	buffer_write(&screen.back, 0, 0, "¶name¶")
+	buffer_set(&screen.back, 6, 0, Cell{character = '\x1b'})
+	output := screen_render(&screen)
+	defer strings.builder_destroy(&output)
+	rendered := strings.to_string(output)
+	testing.expect(t, strings.has_prefix(rendered, "\e[2J\e[H"))
+	testing.expect(t, strings.contains(rendered, "\e[1;2Hname"))
+	testing.expect(t, strings.contains(rendered, "\e[1;7H?"))
+	testing.expect(t, !strings.contains(rendered, "\e[1;7H\e"))
+}
+
+@(test)
+renderer_repositions_after_double_width_unicode :: proc(t: ^testing.T) {
+	screen: Screen
+	screen_init(&screen, 8, 1)
+	defer screen_destroy(&screen)
+	buffer_write(&screen.back, 0, 0, "界name")
+	output := screen_render(&screen)
+	defer strings.builder_destroy(&output)
+	testing.expect(t, strings.contains(strings.to_string(output), "\e[1;3Hname"))
 }
 
 import "core:testing"
