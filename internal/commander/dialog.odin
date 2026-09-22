@@ -53,10 +53,12 @@ dialog_write :: proc(
 	role := Dialog_Text_Role.Body,
 ) {
 	rendered := text
+	formatted := ""
 	if role == .Action {
-		rendered = format_action_hints(text)
-		defer delete(rendered)
+		formatted = format_action_hints(text)
+		rendered = formatted
 	}
+	defer delete(formatted)
 	style := dialog.theme.dialog_surface
 	switch role {
 	case .Accent:

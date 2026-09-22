@@ -76,4 +76,13 @@ exit_dialog_contains_question_and_actions :: proc(t: ^testing.T) {
 	testing.expect_value(t, tui.buffer_get(&buffer, 13, 13).character, rune('['))
 	testing.expect_value(t, tui.buffer_get(&buffer, 14, 13).character, rune('E'))
 	testing.expect(t, .Dim in tui.buffer_get(&buffer, 0, 0).style.attributes)
+
+	tui.buffer_init(&buffer, 56, 16)
+	light := theme_for(.Light)
+	defer destroy_theme(&light)
+	draw_exit_dialog(&buffer, 56, 16, light)
+	// Na wąskim, jasnym ekranie obie podpowiedzi muszą pozostać widoczne.
+	testing.expect_value(t, tui.buffer_get(&buffer, 5, 9).character, rune('['))
+	testing.expect_value(t, tui.buffer_get(&buffer, 20, 9).character, rune('['))
+	testing.expect_value(t, tui.buffer_get(&buffer, 5, 9).style.background_rgb, light.dialog_action.background_rgb)
 }
