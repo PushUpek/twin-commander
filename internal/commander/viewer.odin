@@ -173,12 +173,21 @@ draw_viewer :: proc(buffer: ^tui.Buffer, width, height: int, app: ^App_State, th
 	mode := tr("tekst")
 	if app.viewer_hex do mode = tr("hex")
 	footer := fmt.aprintf(tr(" Tryb: %s | [F4/H] przełącz | [F7 lub /] szukaj | [N] następny | [F3/Esc] zamknij "), mode)
-	if strings.rune_count(footer) > rect.width - 4 {
+	footer_width := rect.width - 4
+	if strings.rune_count(footer) > footer_width {
 		delete(footer)
 		footer = fmt.aprintf(tr(" %s | [F4/H] tryb | [/] szukaj | [N] dalej | [Esc] zamknij "), mode)
 	}
+	if strings.rune_count(footer) > footer_width {
+		delete(footer)
+		footer = fmt.aprintf(tr(" %s | [H] tryb | [/] szukaj | [Esc] zamknij "), mode)
+	}
+	if strings.rune_count(footer) > footer_width {
+		delete(footer)
+		footer = strings.clone(tr("[Esc] zamknij")) or_else ""
+	}
 	defer delete(footer)
-	tui.buffer_write(buffer, rect.x + 2, rect.y + rect.height - 1, footer, theme.dialog_action, rect.width - 4)
+	tui.buffer_write(buffer, rect.x + 2, rect.y + rect.height - 1, footer, theme.dialog_action, footer_width)
 	if app.viewer_search_edit_pending {
 		draw_name_edit_dialog(buffer, width, height, app.viewer_query, app.viewer_query_cursor,
 			tr("Szukaj w podglądzie"), tr("Enter Szukaj"), theme, tr("Tekst:"))

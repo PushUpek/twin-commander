@@ -15,6 +15,109 @@ action_hints_bracket_keys_without_changing_descriptions :: proc(t: ^testing.T) {
 	testing.expect(t, strings.contains(localized, "[Enter/T] Yes"))
 }
 
+count_visible_action_keys :: proc(buffer: ^tui.Buffer, theme: Theme) -> int {
+	count := 0
+	for cell in buffer.cells {
+		if cell.character == '[' && cell.style == theme.dialog_action do count += 1
+	}
+	return count
+}
+
+action_row_contains :: proc(buffer: ^tui.Buffer, row: int, key: string, theme: Theme) -> bool {
+	for x in 0 ..< buffer.width - len(key) + 1 {
+		found := true
+		for index in 0 ..< len(key) {
+			cell := tui.buffer_get(buffer, x + index, row)
+			if cell.character != rune(key[index]) || cell.style != theme.dialog_action {
+				found = false
+				break
+			}
+		}
+		if found do return true
+	}
+	return false
+}
+
+@(test)
+dialog_action_hints_remain_visible_in_both_themes :: proc(t: ^testing.T) {
+	modes := []Theme_Mode {.Dark, .Light}
+	for mode in modes {
+		theme := theme_for(mode)
+		defer destroy_theme(&theme)
+		buffer: tui.Buffer
+		tui.buffer_init(&buffer, 56, 24)
+		defer tui.buffer_destroy(&buffer)
+		app: App_State
+
+		draw_exit_dialog(&buffer, 56, 24, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 2)
+		tui.buffer_clear(&buffer)
+		draw_overwrite_dialog(&buffer, 56, 24, "plik.txt", theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 3)
+		tui.buffer_clear(&buffer)
+		draw_move_overwrite_dialog(&buffer, 56, 24, "plik.txt", theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 3)
+		tui.buffer_clear(&buffer)
+		draw_delete_dialog(&buffer, 56, 24, "plik.txt", theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 3)
+		tui.buffer_clear(&buffer)
+		draw_bulk_confirmation_dialog(&buffer, 56, 24, "plik.txt", 2, .Copy, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 2)
+		tui.buffer_clear(&buffer)
+		draw_name_edit_dialog(&buffer, 56, 24, "", 0, "Nazwa", "Enter Zapisz", theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 2)
+		tui.buffer_clear(&buffer)
+		draw_operation_error_dialog(&buffer, 56, 24, "plik.txt", "Błąd", theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 3)
+		tui.buffer_clear(&buffer)
+		draw_help_dialog(&buffer, 56, 24, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 1)
+		tui.buffer_clear(&buffer)
+		app.menu_kind = .User
+		draw_menu_dialog(&buffer, 56, 24, &app, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 2)
+		tui.buffer_clear(&buffer)
+		app.menu_kind = .Main
+		draw_menu_dialog(&buffer, 56, 24, &app, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 2)
+		tui.buffer_clear(&buffer)
+		draw_bookmarks_dialog(&buffer, 56, 24, &app, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 4)
+		tui.buffer_clear(&buffer)
+		draw_search_results_dialog(&buffer, 56, 24, &app, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 2)
+		tui.buffer_clear(&buffer)
+		draw_properties_dialog(&buffer, 56, 24, &app, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 2)
+		tui.buffer_clear(&buffer)
+		app.property_is_symlink = true
+		draw_properties_dialog(&buffer, 56, 24, &app, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 1)
+		tui.buffer_clear(&buffer)
+		draw_background_dialog(&buffer, 56, 24, &app, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 4)
+		tui.buffer_clear(&buffer)
+		draw_checksum_dialog(&buffer, 56, 24, &app, theme)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 2)
+	}
+}
+
+@(test)
+viewer_close_hint_survives_narrow_widths :: proc(t: ^testing.T) {
+	theme := theme_for(.Light)
+	defer destroy_theme(&theme)
+	buffer: tui.Buffer
+	defer tui.buffer_destroy(&buffer)
+	app: App_State
+	widths := []int {80, 56, 20}
+	for width in widths {
+		tui.buffer_init(&buffer, width, 24)
+		draw_viewer(&buffer, width, 24, &app, theme)
+		testing.expect(t, action_row_contains(&buffer, 22, "[Esc]", theme))
+		if width == 56 do testing.expect(t, action_row_contains(&buffer, 22, "[H]", theme))
+	}
+}
+
 @(test)
 overwrite_dialog_is_centered_and_contains_actions :: proc(t: ^testing.T) {
 	buffer: tui.Buffer
