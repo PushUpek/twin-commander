@@ -7,6 +7,7 @@ import "core:unicode/utf8"
 import "tc:internal/fsops"
 
 panel_destroy :: proc(panel: ^Panel_State) {
+	if len(panel.archive_root) > 0 do os.remove_all(filepath.dir(panel.archive_root))
 	delete(panel.path)
 	if panel.files != nil {
 		os.file_info_slice_delete(panel.files, context.allocator)
@@ -15,6 +16,9 @@ panel_destroy :: proc(panel: ^Panel_State) {
 	delete(panel.marked)
 	delete(panel.filter)
 	delete(panel.quick_search)
+	delete(panel.archive_root)
+	delete(panel.archive_source)
+	delete(panel.archive_parent)
 	for path in panel.history do delete(path)
 	delete(panel.history)
 	panel^ = {}

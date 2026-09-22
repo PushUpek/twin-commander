@@ -27,7 +27,7 @@ Obsługiwane klawisze:
 
 - `↑`/`↓` — zmiana zaznaczenia,
 - `Home`/`End`, `Page Up`/`Page Down` — początek, koniec i przewijanie panelu stronami,
-- `Enter` — wejście do zaznaczonego katalogu (wpis `..` przechodzi wyżej),
+- `Enter` — wejście do katalogu, otwarcie ZIP/TAR jak katalogu albo uruchomienie skojarzonego programu dla pliku (wpis `..` przechodzi wyżej),
 - `Backspace` — przejście do katalogu nadrzędnego,
 - `←`/`→` — poprzedni lub następny katalog w historii aktywnego panelu,
 - `Tab` — przełączenie aktywnego panelu,
@@ -43,26 +43,48 @@ Obsługiwane klawisze:
 - `Ctrl-B` — trwałe zakładki katalogów; `A` dodaje bieżący katalog, `D` usuwa zakładkę, a `Enter` ją otwiera,
 - `Ctrl-Q` — porównanie obu paneli i oznaczenie elementów brakujących lub różniących się typem, rozmiarem albo datą modyfikacji,
 - `Ctrl-U` — rekurencyjne obliczenie rozmiaru zaznaczonego katalogu; wolne i całkowite miejsce systemu plików jest widoczne na dolnej krawędzi każdego panelu,
+- `Ctrl-K` — obliczenie SHA-256, porównanie z plikiem o tej samej nazwie w drugim panelu i opcjonalny zapis pliku `.sha256`,
+- `Ctrl-L` — utworzenie w drugim panelu linku symbolicznego lub twardego; `Tab` przełącza rodzaj linku,
+- `Ctrl-J` — dodanie zaznaczonych plików do kolejki kopiowania w tle,
+- `Ctrl-T` — kolejka operacji; `P` pauzuje, `R` wznawia, a `C` anuluje zadanie,
 - `:` — wykonanie polecenia przez `$SHELL` w katalogu aktywnego panelu,
 - `Ctrl-O` — otwarcie interaktywnej powłoki w katalogu aktywnego panelu,
 - `F1` — pomoc klawiaturowa, `F2` — menu użytkownika, `F9` — menu główne,
-- `F3` lub `v` — otwarcie zaznaczonego pliku tylko do odczytu w zewnętrznym pagerze (`$PAGER`, domyślnie `less`),
+- `F3` lub `v` — wbudowany podgląd z numerami linii; `F4`/`H` przełącza tryb hex, `F7` lub `/` wyszukuje, a `N` przechodzi do następnego wyniku,
 - `F4` lub `e` — otwarcie zaznaczonego pliku w zewnętrznym edytorze (`$VISUAL`, następnie `$EDITOR`, domyślnie `vi`),
 - `F5` — skopiowanie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu; dla pojedynczego elementu pozwala ustawić nazwę kopii,
 - `F6` — przeniesienie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu; dla pojedynczego elementu pozwala też zmienić nazwę docelową,
 - `F7` — tworzenie w aktywnym panelu: nazwa bez `/` tworzy pusty plik, z `/` katalog wraz z brakującymi katalogami nadrzędnymi (`mkdir -p`); istniejące pliki nie są nadpisywane,
 - `F8` — usunięcie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) po potwierdzeniu,
-- `F10` — otwarcie dialogu potwierdzenia zakończenia programu; `Esc` anuluje dialogi i operacje, ale nie zamyka programu.
+- `Esc` lub `F10` — otwarcie dialogu potwierdzenia zakończenia programu w głównym widoku; gdy aktywne jest szybkie wyszukiwanie, pierwsze `Esc` je czyści. W dialogach `Esc` anuluje bieżącą czynność.
 - `Ctrl-C` — natychmiastowe zakończenie programu.
 
-Na czas podglądu lub edycji Twin Commander oddaje zewnętrznemu programowi zwykły
-terminal. Po zamknięciu programu wraca do interfejsu i po edycji odświeża aktywny
-panel. Zmienne `PAGER`, `VISUAL` i `EDITOR` mogą zawierać również argumenty, np.
+Na czas edycji Twin Commander oddaje zewnętrznemu programowi zwykły terminal.
+Po zamknięciu programu wraca do interfejsu i odświeża aktywny panel. Zmienne
+`VISUAL` i `EDITOR` mogą zawierać również argumenty, np.
 `EDITOR="code --wait"`.
 
 Polecenia uruchamiane przez `:` pokazują zwykłe wyjście terminala oraz kod
 zakończenia. Twin Commander czeka na `Enter`, dzięki czemu wynik nie znika przed
 powrotem do paneli. Kod zakończenia pozostaje następnie widoczny na pasku stanu.
+
+Archiwa `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`, `.tar.xz` i
+`.txz` są otwierane przez `Enter` jako tymczasowy panel tylko do odczytu. Można
+z niego kopiować pliki do drugiego panelu. Obsługa korzysta z poleceń `tar` i
+`unzip`, a przed rozpakowaniem odrzuca ścieżki absolutne oraz elementy `..`.
+
+Domyślnie pliki PDF, obrazy i multimedia są otwierane przez systemowy `open`
+na macOS albo `xdg-open` na pozostałych systemach. Własne skojarzenia można
+zapisać w pliku `twin-commander/associations` w katalogu konfiguracji użytkownika
+lub wskazać przez `TWIN_COMMANDER_ASSOCIATIONS_FILE`:
+
+```text
+.pdf = "zathura"
+.png = "feh --scale-down"
+```
+
+Polecenie może zawierać argumenty; ścieżka pliku jest przekazywana jako osobny,
+cytowany argument. Brak skojarzenia powoduje otwarcie wbudowanego podglądu.
 
 Podczas kopiowania pływające okno pokazuje procentowy postęp operacji. Jeśli element
 o tej samej nazwie już istnieje w panelu docelowym, program najpierw poprosi o
@@ -179,3 +201,12 @@ Testy pakietu można uruchomić poleceniem:
 ```sh
 make test
 ```
+
+## Dodatkowy etap: rozbudowa podglądu i sum kontrolnych
+
+Planowane rozszerzenia:
+
+- formatowanie treści bez zmiany pliku źródłowego — najpierw JSON w stylu `jq`, z możliwością przełączenia między widokiem oryginalnym i sformatowanym; błędny JSON pozostaje w widoku oryginalnym z czytelnym komunikatem,
+- kolorowanie składni w podglądzie, zaczynając od JSON (klucze, wartości, liczby i znaki strukturalne), a następnie dla rozpoznanych plików tekstowych,
+- zachowanie wyszukiwania, numerów linii i trybu hex także po dodaniu formatowania oraz kolorów,
+- możliwość przełączania algorytmu sumy kontrolnej (`Ctrl-K`) między MD5 a wariantami SHA (np. SHA-1, SHA-256 i SHA-512), z porównywaniem plików i zapisem sumy dla wybranego algorytmu.

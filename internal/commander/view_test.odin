@@ -1,8 +1,19 @@
 package commander
 
 import "core:os"
+import "core:strings"
 import "core:testing"
 import "tc:internal/tui"
+
+@(test)
+action_hints_bracket_keys_without_changing_descriptions :: proc(t: ^testing.T) {
+	formatted := format_action_hints(" Enter/T Tak   Esc/N Nie   W Wszystkie ")
+	defer delete(formatted)
+	testing.expect_value(t, formatted, "[Enter/T] Tak  [Esc/N] Nie  [W] Wszystkie")
+	localized := format_action_hints(" Enter/T Yes   Esc/N No ")
+	defer delete(localized)
+	testing.expect(t, strings.contains(localized, "[Enter/T] Yes"))
+}
 
 @(test)
 overwrite_dialog_is_centered_and_contains_actions :: proc(t: ^testing.T) {

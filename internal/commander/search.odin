@@ -118,12 +118,13 @@ open_search_result :: proc(app: ^App_State) {
 	}
 	defer os.file_info_delete(info, context.allocator)
 	panel := &app.panels[app.active_panel]
+	record_history := !panel_is_archive(panel)
 	if info.type == .Directory {
-		err = panel_load(panel, path)
+		err = panel_load(panel, path, record_history)
 	} else {
 		directory := filepath.dir(path)
 		name := filepath.base(path)
-		err = panel_load(panel, directory)
+		err = panel_load(panel, directory, record_history)
 		if err == nil do panel_select_name(panel, name)
 	}
 	if err != nil {

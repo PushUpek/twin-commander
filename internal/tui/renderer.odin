@@ -40,6 +40,7 @@ screen_begin :: proc(screen: ^Screen) -> ^Buffer {
 
 screen_render :: proc(screen: ^Screen) -> strings.Builder {
 	output := strings.builder_make()
+	if screen.force_redraw do strings.write_string(&output, "\e[2J\e[H")
 	active_style := Style{}
 	style_valid := false
 
@@ -49,6 +50,10 @@ screen_render :: proc(screen: ^Screen) -> strings.Builder {
 			index := y * screen.back.width + x
 			cell := screen.back.cells[index]
 			if !screen.force_redraw && cell == screen.front.cells[index] {
+				x += 1
+				continue
+			}
+			if cell.character == 0 {
 				x += 1
 				continue
 			}
@@ -66,8 +71,16 @@ screen_render :: proc(screen: ^Screen) -> strings.Builder {
 					style_valid = true
 				}
 				if cell.character != 0 {
-					encoded, count := utf8.encode_rune(cell.character)
+					character := cell.character
+					if character < ' ' || character == 127 do character = '?'
+					encoded, count := utf8.encode_rune(character)
 					strings.write_bytes(&output, encoded[:count])
+					// Terminale mogą inaczej liczyć szerokość znaków Unicode.
+					// Następny fragment zaczynamy od bezwzględnej pozycji.
+					if character > 127 {
+						x += 1
+						break
+					}
 				}
 				x += 1
 			}
