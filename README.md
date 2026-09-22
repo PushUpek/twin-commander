@@ -43,21 +43,28 @@ Obsługiwane klawisze:
 - `Ctrl-B` — trwałe zakładki katalogów; `A` dodaje bieżący katalog, `D` usuwa zakładkę, a `Enter` ją otwiera,
 - `Ctrl-Q` — porównanie obu paneli i oznaczenie elementów brakujących lub różniących się typem, rozmiarem albo datą modyfikacji,
 - `Ctrl-U` — rekurencyjne obliczenie rozmiaru zaznaczonego katalogu; wolne i całkowite miejsce systemu plików jest widoczne na dolnej krawędzi każdego panelu,
-- `Ctrl-K` — obliczenie SHA-256, porównanie z plikiem o tej samej nazwie w drugim panelu i opcjonalny zapis pliku `.sha256`,
+- `Ctrl-K` — suma kontrolna i porównanie z plikiem o tej samej nazwie w drugim panelu; `Tab` przełącza MD5 oraz SHA-1/224/256/384/512, a `G` zapisuje plik sumy dla wybranego algorytmu,
 - `Ctrl-L` — utworzenie w drugim panelu linku symbolicznego lub twardego; `Tab` przełącza rodzaj linku,
 - `Ctrl-J` — dodanie zaznaczonych plików do kolejki kopiowania w tle,
 - `Ctrl-T` — kolejka operacji; `P` pauzuje, `R` wznawia, a `C` anuluje zadanie,
 - `:` — wykonanie polecenia przez `$SHELL` w katalogu aktywnego panelu,
 - `Ctrl-O` — otwarcie interaktywnej powłoki w katalogu aktywnego panelu,
 - `F1` — pomoc klawiaturowa, `F2` — menu użytkownika, `F9` — menu główne,
-- `F3` lub `v` — wbudowany podgląd z numerami linii; `F4`/`H` przełącza tryb hex, `F7` lub `/` wyszukuje, a `N` przechodzi do następnego wyniku,
+- `F3` lub `v` — wbudowany podgląd z numerami linii; `F4`/`H` przełącza tryb hex, `F7` lub `/` wyszukuje, a `N` przechodzi do następnego wyniku. Dla poprawnego JSON-a do 8 MiB `F5`/`F` włącza formatowanie bez zmiany pliku, a `F6`/`C` przełącza kolorowanie składni,
 - `F4` lub `e` — otwarcie zaznaczonego pliku w zewnętrznym edytorze (`$VISUAL`, następnie `$EDITOR`, domyślnie `vi`),
 - `F5` — skopiowanie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu; dla pojedynczego elementu pozwala ustawić nazwę kopii,
 - `F6` — przeniesienie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) do katalogu w drugim panelu; dla pojedynczego elementu pozwala też zmienić nazwę docelową,
 - `F7` — tworzenie w aktywnym panelu: nazwa bez `/` tworzy pusty plik, z `/` katalog wraz z brakującymi katalogami nadrzędnymi (`mkdir -p`); istniejące pliki nie są nadpisywane,
 - `F8` — usunięcie oznaczonych elementów (lub bieżącego elementu, gdy nic nie oznaczono) po potwierdzeniu,
+- `F11` — przełączenie aktywnego panelu między listą plików, drzewem katalogów, informacjami i szybkim podglądem,
+- `F12` — rekurencyjne porównanie katalogów obu paneli,
+- `Ctrl-Y` — jednokierunkowa synchronizacja do drugiego panelu po pokazaniu podsumowania; dodatkowe pliki u celu pozostają,
+- `Ctrl-N` — otwarcie skonfigurowanego panelu SFTP/FTP,
 - `Esc` lub `F10` — otwarcie dialogu potwierdzenia zakończenia programu w głównym widoku; gdy aktywne jest szybkie wyszukiwanie, pierwsze `Esc` je czyści. W dialogach `Esc` anuluje bieżącą czynność.
 - `Ctrl-C` — natychmiastowe zakończenie programu.
+
+Mysz pozwala wskazać panel i plik, otworzyć element podwójnym kliknięciem oraz
+przewijać listę lub podgląd kółkiem w terminalach obsługujących SGR mouse.
 
 Na czas edycji Twin Commander oddaje zewnętrznemu programowi zwykły terminal.
 Po zamknięciu programu wraca do interfejsu i odświeża aktywny panel. Zmienne
@@ -102,6 +109,56 @@ pliki binarne i pliki większe niż 8 MiB. Zakładki są zapisywane w katalogu
 konfiguracji użytkownika; ścieżkę można nadpisać zmienną
 `TWIN_COMMANDER_BOOKMARKS_FILE`. Porównanie paneli działa na ich bieżącej, nierozwijanej
 rekurencyjnie zawartości; katalogi o tej samej nazwie i typie są uznawane za zgodne.
+Osobne porównanie rekurencyjne (`F12`) uwzględnia ścieżkę, typ, rozmiar i — jeśli
+jest dostępna — datę modyfikacji. Nie porównuje bajt po bajcie zawartości plików.
+
+## Panele SFTP/FTP i synchronizacja
+
+Do paneli zdalnych oraz synchronizacji z udziałem serwera potrzebny jest
+[rclone](https://rclone.org/install/) dostępny w `PATH`. Najpierw skonfiguruj
+połączenie poleceniem `rclone config` jako zdalny zasób typu SFTP albo FTP.
+Następnie w Twin Commander naciśnij `Ctrl-N` (lub wybierz „Połącz SFTP/FTP” z
+menu głównego) i podaj ścieżkę `nazwa-zasobu:ścieżka`, np. `serwer:projekty`.
+Wpis `..` pozwala wracać w górę; na korzeniu zasobu wraca do poprzedniego
+katalogu lokalnego. Dane uwierzytelniające pozostają w konfiguracji rclone,
+nie w Twin Commander. Dla SFTP warto skonfigurować weryfikację klucza serwera.
+Zwykłe FTP nie szyfruje połączenia; do przesyłania danych w niezaufanej sieci
+użyj SFTP albo FTP z TLS skonfigurowanym w rclone.
+
+Zdalny panel obsługuje listowanie, podgląd, edycję z pobraniem i odesłaniem
+pliku, tworzenie, kopiowanie, przenoszenie, zmianę nazwy i usuwanie plików oraz
+katalogów. `F5`/`F6` działają między panelem lokalnym i zdalnym oraz między
+dwoma panelami zdalnymi. Usunięcie katalogu zdalnego usuwa go rekurencyjnie,
+po zwykłym potwierdzeniu `F8`. Połączenie wymaga poprawnej konfiguracji rclone;
+program nie instaluje jej automatycznie.
+
+`Ctrl-Y` pokazuje podsumowanie przed synchronizacją. Kopiowanie jest
+jednokierunkowe i nie usuwa dodatkowych plików u celu. Dla katalogów lokalnych
+nie wymaga rclone; dla zdalnych używa polecenia `rclone copy`. Zwykłe `Ctrl-Q`
+porównuje tylko bieżący poziom, a `F12` porównuje katalogi rekurencyjnie.
+
+## Konfiguracja skrótów
+
+Główne akcje można przypisać do innych klawiszy w pliku
+`twin-commander/shortcuts.json` w katalogu konfiguracji użytkownika albo w
+pliku wskazanym przez `TWIN_COMMANDER_SHORTCUTS_FILE`. Przykład:
+
+```json
+{
+  "view": "Ctrl-V",
+  "recursive_compare": "Ctrl-Q"
+}
+```
+
+Każda akcja ma jeden skrót. Dostępne nazwy: `help`, `user_menu`, `main_menu`,
+`view`, `edit`, `copy`, `move`, `create`, `delete`, `exit`, `panel_mode`,
+`recursive_compare`, `sync`, `remote`, `checksum`. Akceptowane są klawisze
+`F1`–`F12`, `Esc`, `Enter`, `Tab`, pojedyncze litery i modyfikatory `Ctrl-`,
+`Alt-`, a dla klawiszy funkcyjnych także `Shift-`. Dublujące się lub
+niepoprawne przypisania są odrzucane.
+`Esc` nadal anuluje dialogi oraz — w głównym widoku — otwiera potwierdzenie
+wyjścia niezależnie od konfiguracji. Pomoc i pasek dolny opisują domyślne
+skróty; po zmianie przypisań obowiązuje plik konfiguracyjny.
 
 Interfejs ma dwa odrębne szablony kolorystyczne: Kanso Pearl dla trybu jasnego
 i Kanso Mist dla trybu ciemnego. Ich definicje TOML znajdują się w
@@ -204,7 +261,7 @@ make test
 
 ## Dodatkowy etap: rozbudowa podglądu i sum kontrolnych
 
-Planowane rozszerzenia:
+Zrealizowane rozszerzenia:
 
 - formatowanie treści bez zmiany pliku źródłowego — najpierw JSON w stylu `jq`, z możliwością przełączenia między widokiem oryginalnym i sformatowanym; błędny JSON pozostaje w widoku oryginalnym z czytelnym komunikatem,
 - kolorowanie składni w podglądzie, zaczynając od JSON (klucze, wartości, liczby i znaki strukturalne), a następnie dla rozpoznanych plików tekstowych,

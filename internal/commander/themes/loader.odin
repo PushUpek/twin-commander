@@ -122,6 +122,16 @@ style_for_section :: proc(theme: ^Theme, section: string) -> (^tui.Style, bool) 
 		return &theme.dialog_accent, true
 	case "dialog_action":
 		return &theme.dialog_action, true
+	case "viewer_json_key":
+		return &theme.viewer_json_key, true
+	case "viewer_json_string":
+		return &theme.viewer_json_string, true
+	case "viewer_json_number":
+		return &theme.viewer_json_number, true
+	case "viewer_json_literal":
+		return &theme.viewer_json_literal, true
+	case "viewer_json_punctuation":
+		return &theme.viewer_json_punctuation, true
 	case "progress_track":
 		return &theme.progress_track, true
 	case "progress_fill":
@@ -204,6 +214,11 @@ theme_is_complete :: proc(theme: ^Theme) -> bool {
 		&theme.dialog_border,
 		&theme.dialog_accent,
 		&theme.dialog_action,
+		&theme.viewer_json_key,
+		&theme.viewer_json_string,
+		&theme.viewer_json_number,
+		&theme.viewer_json_literal,
+		&theme.viewer_json_punctuation,
 	}
 	for style in styles {
 		if !style.foreground_rgb.valid || !style.background_rgb.valid {

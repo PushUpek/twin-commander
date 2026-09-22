@@ -22,6 +22,10 @@ handle_create_edit_event :: proc(app: ^App_State, event: tui.Event) {
 			return
 		}
 		panel := &app.panels[app.active_panel]
+		if panel.remote {
+			remote_create_entry(app)
+			return
+		}
 		path := filepath.join({panel.path, app.create_name}) or_else ""
 		defer delete(path)
 		if len(path) == 0 {

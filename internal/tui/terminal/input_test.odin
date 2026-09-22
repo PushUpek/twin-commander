@@ -70,6 +70,24 @@ session_with_pending :: proc(value: string) -> Session {
 }
 
 @(test)
+sgr_mouse_reports_click_wheel_and_release :: proc(t: ^testing.T) {
+	for item in ([]struct {sequence: string, action: Mouse_Action, x: int, y: int}{
+		{"\e[<0;12;4M", .Press, 11, 3},
+		{"\e[<0;12;4m", .Release, 11, 3},
+		{"\e[<64;2;3M", .Scroll_Up, 1, 2},
+		{"\e[<65;2;3M", .Scroll_Down, 1, 2},
+	}) {
+		session := session_with_pending(item.sequence)
+		event, ok := parse_pending(&session)
+		testing.expect(t, ok)
+		testing.expect_value(t, event.kind, Event_Kind.Mouse)
+		testing.expect_value(t, event.mouse_action, item.action)
+		testing.expect_value(t, event.mouse_x, item.x)
+		testing.expect_value(t, event.mouse_y, item.y)
+	}
+}
+
+@(test)
 function_keys_support_ss3_and_csi_terminal_encodings :: proc(t: ^testing.T) {
 	for item in ([]struct {sequence: string, key: Key}{
 		{"\eOR", .F3}, {"\eOS", .F4},
@@ -95,5 +113,26 @@ alt_f7_is_parsed_for_recursive_search :: proc(t: ^testing.T) {
 	event, ok := parse_pending(&session)
 	testing.expect(t, ok)
 	testing.expect_value(t, event.key, Key.F7)
+	testing.expect(t, .Alt in event.modifiers)
+}
+
+@(test)
+modified_function_keys_and_alt_letters_are_parsed :: proc(t: ^testing.T) {
+	for item in ([]struct {sequence: string, key: Key, modifiers: Modifiers}{
+		{"\e[1;5R", .F3, {.Control}},
+		{"\e[18;3~", .F7, {.Alt}},
+		{"\e[24;2~", .F12, {.Shift}},
+	}) {
+		session := session_with_pending(item.sequence)
+		event, ok := parse_pending(&session)
+		testing.expect(t, ok)
+		testing.expect_value(t, event.key, item.key)
+		testing.expect_value(t, event.modifiers, item.modifiers)
+	}
+	alt := session_with_pending("\ex")
+	event, ok := parse_pending(&alt)
+	testing.expect(t, ok)
+	testing.expect_value(t, event.kind, Event_Kind.Text)
+	testing.expect_value(t, event.text, rune('x'))
 	testing.expect(t, .Alt in event.modifiers)
 }

@@ -23,29 +23,74 @@ begin_viewer :: proc(app: ^App_State) {
 		set_status(app, fmt.aprintf(tr("Plik jest zbyt duży dla podglądu (%d MiB limit)"), MAX_VIEWER_SIZE / 1024 / 1024))
 		return
 	}
-	data, err := os.read_entire_file(file.fullpath, context.allocator)
+	data: []byte
+	err: os.Error
+	if panel.remote {
+		ok: bool
+		limit := fmt.aprintf("%d", MAX_VIEWER_SIZE + 1)
+		defer delete(limit)
+		data, ok = remote_run([]string{"cat", "--count", limit, file.fullpath})
+		if !ok do err = .Invalid_Command
+	} else {
+		data, err = os.read_entire_file(file.fullpath, context.allocator)
+	}
 	if err != nil {
 		set_status(app, fmt.aprintf(tr("Nie można odczytać pliku: %s"), os.error_string(err)))
+		return
+	}
+	if len(data) > MAX_VIEWER_SIZE {
+		delete(data)
+		set_status(app, fmt.aprintf(tr("Plik jest zbyt duży dla podglądu (%d MiB limit)"), MAX_VIEWER_SIZE / 1024 / 1024))
 		return
 	}
 	clear_viewer(app)
 	app.viewer_data = data
 	app.viewer_path = strings.clone(file.fullpath) or_else ""
-	append(&app.viewer_line_starts, 0)
-	for byte, index in data {
-		if byte == '\n' && index + 1 < len(data) do append(&app.viewer_line_starts, index + 1)
+	viewer_index_lines(data, &app.viewer_line_starts)
+	if strings.equal_fold(file.name[max(len(file.name) - 5, 0):], ".json") && len(data) <= 8 * 1024 * 1024 {
+		formatted, valid := viewer_pretty_json(data)
+		if valid {
+			app.viewer_formatted_data = formatted
+			viewer_index_lines(formatted, &app.viewer_formatted_line_starts)
+			app.viewer_json_available = true
+			app.viewer_syntax = true
+		}
 	}
 	app.viewer_pending = true
+}
+
+viewer_index_lines :: proc(data: []byte, lines: ^[dynamic]int) {
+	append(lines, 0)
+	for byte, index in data {
+		if byte == '\n' && index + 1 < len(data) do append(lines, index + 1)
+	}
+}
+
+viewer_active_data :: proc(app: ^App_State) -> []byte {
+	if app.viewer_formatted && !app.viewer_hex do return app.viewer_formatted_data
+	return app.viewer_data
+}
+
+viewer_active_lines :: proc(app: ^App_State) -> []int {
+	if app.viewer_formatted && !app.viewer_hex do return app.viewer_formatted_line_starts[:]
+	return app.viewer_line_starts[:]
 }
 
 clear_viewer :: proc(app: ^App_State) {
 	delete(app.viewer_path)
 	delete(app.viewer_data)
 	delete(app.viewer_line_starts)
+	delete(app.viewer_formatted_data)
+	delete(app.viewer_formatted_line_starts)
 	delete(app.viewer_query)
 	app.viewer_path = ""
 	app.viewer_data = nil
 	app.viewer_line_starts = nil
+	app.viewer_formatted_data = nil
+	app.viewer_formatted_line_starts = nil
+	app.viewer_json_available = false
+	app.viewer_formatted = false
+	app.viewer_syntax = false
 	app.viewer_query = ""
 	app.viewer_query_cursor = 0
 	app.viewer_top = 0
@@ -80,6 +125,8 @@ handle_viewer_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event
 			app.viewer_hex = !app.viewer_hex
 			app.viewer_top = 0
 		case .F7: begin_viewer_search(app)
+		case .F5: viewer_toggle_format(app)
+		case .F6: viewer_toggle_syntax(app)
 		case:
 		}
 		return
@@ -91,9 +138,25 @@ handle_viewer_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event
 		case 'h', 'H':
 			app.viewer_hex = !app.viewer_hex
 			app.viewer_top = 0
+		case 'f', 'F': viewer_toggle_format(app)
+		case 'c', 'C': viewer_toggle_syntax(app)
 		case:
 		}
 	}
+}
+
+viewer_toggle_format :: proc(app: ^App_State) {
+	if !app.viewer_json_available {
+		set_status(app, strings.clone(tr("Nie można sformatować: plik nie jest poprawnym JSON-em lub jest zbyt duży")) or_else "")
+		return
+	}
+	app.viewer_formatted = !app.viewer_formatted
+	app.viewer_top = 0
+}
+
+viewer_toggle_syntax :: proc(app: ^App_State) {
+	if !app.viewer_json_available do return
+	app.viewer_syntax = !app.viewer_syntax
 }
 
 begin_viewer_search :: proc(app: ^App_State) {
@@ -103,7 +166,7 @@ begin_viewer_search :: proc(app: ^App_State) {
 
 viewer_max_top :: proc(app: ^App_State) -> int {
 	if app.viewer_hex do return max((len(app.viewer_data) + HEX_BYTES_PER_ROW - 1) / HEX_BYTES_PER_ROW - 1, 0)
-	return max(len(app.viewer_line_starts) - 1, 0)
+	return max(len(viewer_active_lines(app)) - 1, 0)
 }
 
 viewer_move :: proc(app: ^App_State, delta: int) {
@@ -112,14 +175,16 @@ viewer_move :: proc(app: ^App_State, delta: int) {
 
 viewer_find_next :: proc(app: ^App_State) -> bool {
 	if len(app.viewer_query) == 0 do return false
+	data := viewer_active_data(app)
+	lines := viewer_active_lines(app)
 	start := 0
 	if app.viewer_hex {
 		start = min((app.viewer_top + 1) * HEX_BYTES_PER_ROW, len(app.viewer_data))
-	} else if app.viewer_top + 1 < len(app.viewer_line_starts) {
-		start = app.viewer_line_starts[app.viewer_top + 1]
+	} else if app.viewer_top + 1 < len(lines) {
+		start = lines[app.viewer_top + 1]
 	}
-	match := find_bytes_fold(app.viewer_data, transmute([]byte)app.viewer_query, start)
-	if match < 0 && start > 0 do match = find_bytes_fold(app.viewer_data, transmute([]byte)app.viewer_query, 0)
+	match := find_bytes_fold(data, transmute([]byte)app.viewer_query, start)
+	if match < 0 && start > 0 do match = find_bytes_fold(data, transmute([]byte)app.viewer_query, 0)
 	if match < 0 {
 		set_status(app, fmt.aprintf(tr("Nie znaleziono: %s"), app.viewer_query))
 		return false
@@ -128,7 +193,7 @@ viewer_find_next :: proc(app: ^App_State) -> bool {
 		app.viewer_top = match / HEX_BYTES_PER_ROW
 	} else {
 		line := 0
-		for offset, index in app.viewer_line_starts {
+		for offset, index in lines {
 			if offset > match do break
 			line = index
 		}
@@ -172,11 +237,24 @@ draw_viewer :: proc(buffer: ^tui.Buffer, width, height: int, app: ^App_State, th
 	}
 	mode := tr("tekst")
 	if app.viewer_hex do mode = tr("hex")
+	if app.viewer_formatted && !app.viewer_hex do mode = tr("JSON formatowany")
 	footer := fmt.aprintf(tr(" Tryb: %s | [F4/H] przełącz | [F7 lub /] szukaj | [N] następny | [F3/Esc] zamknij "), mode)
 	footer_width := rect.width - 4
 	if strings.rune_count(footer) > footer_width {
 		delete(footer)
 		footer = fmt.aprintf(tr(" %s | [F4/H] tryb | [/] szukaj | [N] dalej | [Esc] zamknij "), mode)
+	}
+	if app.viewer_json_available && !app.viewer_hex {
+		delete(footer)
+		footer = strings.clone(tr(" [F5] format [F6] kolory [/] szukaj [Esc] zamknij ")) or_else ""
+		if strings.rune_count(footer) > footer_width {
+			delete(footer)
+			footer = strings.clone(tr(" [F5] fmt [F6] kolor [Esc] zamknij ")) or_else ""
+		}
+		if strings.rune_count(footer) > footer_width {
+			delete(footer)
+			footer = strings.clone(tr("[Esc] zamknij")) or_else ""
+		}
 	}
 	if strings.rune_count(footer) > footer_width {
 		delete(footer)
@@ -195,24 +273,30 @@ draw_viewer :: proc(buffer: ^tui.Buffer, width, height: int, app: ^App_State, th
 }
 
 draw_viewer_text :: proc(buffer: ^tui.Buffer, rect: tui.Rect, app: ^App_State, theme: Theme, rows: int) {
+	data := viewer_active_data(app)
+	lines := viewer_active_lines(app)
 	for row in 0 ..< rows {
 		line_index := app.viewer_top + row
-		if line_index >= len(app.viewer_line_starts) do break
-		start := app.viewer_line_starts[line_index]
-		end := len(app.viewer_data)
-		if line_index + 1 < len(app.viewer_line_starts) do end = app.viewer_line_starts[line_index + 1] - 1
-		if end > start && app.viewer_data[end - 1] == '\r' do end -= 1
+		if line_index >= len(lines) do break
+		start := lines[line_index]
+		end := len(data)
+		if line_index + 1 < len(lines) do end = lines[line_index + 1] - 1
+		if end > start && data[end - 1] == '\r' do end -= 1
 		number_buffer: [16]byte
 		number := fmt.bprintf(number_buffer[:], "%6d ", line_index + 1)
 		tui.buffer_write(buffer, rect.x + 2, rect.y + 1 + row, number, theme.dialog_accent, 7)
 		clean: [4096]byte
 		count := min(end - start, len(clean))
 		for index in 0 ..< count {
-			byte := app.viewer_data[start + index]
+			byte := data[start + index]
 			if byte < 32 || byte == 127 { byte = ' ' }
 			clean[index] = byte
 		}
-		tui.buffer_write(buffer, rect.x + 9, rect.y + 1 + row, string(clean[:count]), theme.dialog_surface, rect.width - 11)
+		if app.viewer_json_available && app.viewer_syntax {
+			viewer_draw_json_line(buffer, rect.x + 9, rect.y + 1 + row, string(clean[:count]), rect.width - 11, theme)
+		} else {
+			tui.buffer_write(buffer, rect.x + 9, rect.y + 1 + row, string(clean[:count]), theme.dialog_surface, rect.width - 11)
+		}
 	}
 }
 
