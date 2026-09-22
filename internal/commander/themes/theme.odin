@@ -24,6 +24,11 @@ Theme :: struct {
 	dialog_border:         tui.Style,
 	dialog_accent:         tui.Style,
 	dialog_action:         tui.Style,
+	viewer_json_key:      tui.Style,
+	viewer_json_string:   tui.Style,
+	viewer_json_number:   tui.Style,
+	viewer_json_literal:  tui.Style,
+	viewer_json_punctuation: tui.Style,
 	progress_track:        tui.Style,
 	progress_fill:         tui.Style,
 }

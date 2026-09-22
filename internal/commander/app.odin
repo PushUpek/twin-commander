@@ -23,6 +23,7 @@ Run :: proc() {
 		return
 	}
 	associations_load(&app)
+	shortcut_load(&app)
 	last_system_theme_check := time.tick_now()
 
 	ui_context: tui.Context
@@ -58,6 +59,7 @@ Run :: proc() {
 	running := true
 	for running {
 		background_tick(&app)
+		panel_preview_update(&app)
 		if !app.theme_overridden && time.tick_since(last_system_theme_check) >= 2 * time.Second {
 			if mode, ok := system_theme_mode(); ok {
 				set_theme_mode(&app, mode)
@@ -84,17 +86,40 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		apply_appearance(app, event.appearance)
 		return
 	}
+	if event.kind == .Mouse {
+		handle_mouse_event(ctx, app, event, running)
+		return
+	}
 
 	if app.exit_pending {
 		handle_exit_event(app, event, running)
 		return
 	}
 	if app.help_pending {
-		if event.kind == .Key && (event.key == .Escape || event.key == .Enter || event.key == .F1) do app.help_pending = false
+		if event.kind == .Key {
+			#partial switch event.key {
+			case .Escape, .Enter, .F1: app.help_pending = false
+			case .Up: app.help_offset = max(app.help_offset - 1, 0)
+			case .Down: app.help_offset = min(app.help_offset + 1, help_max_offset(ctx))
+			case .Page_Up: app.help_offset = max(app.help_offset - 8, 0)
+			case .Page_Down: app.help_offset = min(app.help_offset + 8, help_max_offset(ctx))
+			case .Home: app.help_offset = 0
+			case .End: app.help_offset = help_max_offset(ctx)
+			case:
+			}
+		}
 		return
 	}
 	if app.menu_kind != .None {
 		handle_menu_event(ctx, app, event, running)
+		return
+	}
+	if app.remote_edit_pending {
+		handle_remote_edit_event(app, event)
+		return
+	}
+	if app.sync_pending {
+		handle_sync_event(app, event)
 		return
 	}
 	if app.command_edit_pending {
@@ -165,16 +190,23 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 		handle_delete_event(app, event, ctx)
 		return
 	}
+	if handle_shortcut(ctx, app, event, running) do return
+	if app.panels[app.active_panel].mode == .Tree && event.kind == .Key {
+		panel := &app.panels[app.active_panel]
+		#partial switch event.key {
+		case .Up: panel.tree_selected = max(panel.tree_selected - 1, 0); return
+		case .Down: panel.tree_selected = min(panel.tree_selected + 1, len(panel.tree_paths) - 1); return
+		case .Home: panel.tree_selected = 0; return
+		case .End: panel.tree_selected = max(len(panel.tree_paths) - 1, 0); return
+		case .Enter: panel_tree_activate(app); return
+		case .Backspace: panel.tree_selected = 0; panel_tree_activate(app); return
+		case:
+		}
+	}
 
 	#partial switch event.kind {
 	case .Key:
 		#partial switch event.key {
-		case .F1:
-			app.help_pending = true
-		case .F2:
-			begin_menu(app, .User)
-		case .F9:
-			begin_menu(app, .Main)
 		case .Escape:
 			panel := &app.panels[app.active_panel]
 			if len(panel.quick_search) > 0 {
@@ -184,8 +216,6 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			} else {
 				app.exit_pending = true
 			}
-		case .F10:
-			app.exit_pending = true
 		case .Tab:
 			app.active_panel = 1 - app.active_panel
 		case .Up:
@@ -212,27 +242,8 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			}
 		case .Enter:
 			activate_selected(ctx, app, running)
-		case .F3:
-			begin_viewer(app)
-		case .F4:
-			if panel_is_archive(&app.panels[app.active_panel]) do archive_read_only_status(app)
-			else do open_selected_file(ctx, app, .Edit, running)
-		case .F5:
-			copy_selected_file(ctx, app)
-		case .F6:
-			if panel_is_archive(&app.panels[app.active_panel]) do archive_read_only_status(app)
-			else do move_selected_entry(app, ctx)
 		case .F7:
-			if .Alt in event.modifiers {
-				begin_search(app)
-			} else if panel_is_archive(&app.panels[app.active_panel]) {
-				archive_read_only_status(app)
-			} else {
-				begin_create_entry(app)
-			}
-		case .F8:
-			if panel_is_archive(&app.panels[app.active_panel]) do archive_read_only_status(app)
-			else do delete_selected_entry(app)
+			if .Alt in event.modifiers do begin_search(app)
 		}
 	case .Text:
 		if .Control in event.modifiers && event.text == 'c' {
@@ -259,8 +270,6 @@ handle_event :: proc(ctx: ^tui.Context, app: ^App_State, event: tui.Event, runni
 			calculate_selected_size(app)
 		} else if .Control in event.modifiers && event.text == 'l' {
 			begin_link(app)
-		} else if .Control in event.modifiers && event.text == 'k' {
-			begin_checksum(app)
 		} else if .Control in event.modifiers && event.text == 'j' {
 			enqueue_copy_jobs(app)
 		} else if .Control in event.modifiers && event.text == 't' {
@@ -312,6 +321,8 @@ activate_selected :: proc(ctx: ^tui.Context, app: ^App_State, running: ^bool) {
 	}
 	if is_directory {
 		enter_selected_directory(app)
+	} else if panel.remote {
+		begin_viewer(app)
 	} else if open_archive(app, file.fullpath) {
 		return
 	} else if !open_associated_file(ctx, app, file.fullpath, running) {
@@ -363,6 +374,10 @@ enter_selected_directory :: proc(app: ^App_State) {
 	panel := &app.panels[app.active_panel]
 	target: string
 	if panel.selected == 0 {
+		if panel.remote {
+			if remote_leave(panel) do set_status(app, fmt.aprintf(tr("Katalog: %s"), panel.path))
+			return
+		}
 		if leave_archive(panel) {
 			set_status(app, fmt.aprintf(tr("Katalog: %s"), panel.path))
 			return

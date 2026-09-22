@@ -2,7 +2,9 @@ package commander
 
 import "core:os"
 import "core:thread"
+import "core:time"
 import "tc:internal/fsops"
+import "tc:internal/tui"
 
 Mark_Mode :: enum {
 	Select,
@@ -29,6 +31,48 @@ Background_Job_State :: enum i32 {
 	Cancelled,
 }
 
+Checksum_Algorithm :: enum {
+	SHA256,
+	MD5,
+	SHA1,
+	SHA224,
+	SHA384,
+	SHA512,
+}
+
+Panel_Mode :: enum {
+	Files,
+	Tree,
+	Info,
+	Quick,
+}
+
+Shortcut_Action :: enum {
+	Help,
+	User_Menu,
+	Main_Menu,
+	View,
+	Edit,
+	Copy,
+	Move,
+	Create,
+	Delete,
+	Exit,
+	Panel_Mode,
+	Recursive_Compare,
+	Sync,
+	Remote,
+	Checksum,
+}
+
+Shortcut_Binding :: struct {
+	action: Shortcut_Action,
+	kind: tui.Event_Kind,
+	key: tui.Key,
+	text: rune,
+	modifiers: tui.Modifiers,
+}
+
 Background_Job :: struct {
 	source: string,
 	destination: string,
@@ -42,6 +86,14 @@ Background_Job :: struct {
 
 Panel_State :: struct {
 	path:     string,
+	remote:   bool,
+	remote_return_path: string,
+	mode: Panel_Mode,
+	tree_paths: [dynamic]string,
+	tree_selected: int,
+	tree_offset: int,
+	preview_path: string,
+	preview_data: []byte,
 	files:    []os.File_Info,
 	marked:   [dynamic]string,
 	selected: int,
@@ -113,13 +165,30 @@ App_State :: struct {
 	command_text: string,
 	command_cursor: int,
 	help_pending: bool,
+	help_offset: int,
 	menu_kind: Menu_Kind,
 	menu_selected: int,
+	shortcuts: [dynamic]Shortcut_Binding,
+	mouse_last_click: time.Tick,
+	mouse_last_panel: int,
+	mouse_last_item: int,
+	remote_edit_pending: bool,
+	remote_text: string,
+	remote_cursor: int,
+	sync_pending: bool,
+	sync_new_count: int,
+	sync_changed_count: int,
+	sync_extra_count: int,
 	viewer_pending: bool,
 	viewer_search_edit_pending: bool,
 	viewer_path: string,
 	viewer_data: []byte,
 	viewer_line_starts: [dynamic]int,
+	viewer_formatted_data: []byte,
+	viewer_formatted_line_starts: [dynamic]int,
+	viewer_json_available: bool,
+	viewer_formatted: bool,
+	viewer_syntax: bool,
 	viewer_top: int,
 	viewer_hex: bool,
 	viewer_query: string,
@@ -130,6 +199,7 @@ App_State :: struct {
 	link_name: string,
 	link_name_cursor: int,
 	checksum_pending: bool,
+	checksum_algorithm: Checksum_Algorithm,
 	checksum_path: string,
 	checksum_hash: string,
 	checksum_other_path: string,
@@ -158,6 +228,8 @@ app_destroy :: proc(app: ^App_State) {
 	}
 	destroy_theme(&app.theme)
 	delete(app.status)
+	delete(app.remote_text)
+	delete(app.shortcuts)
 	delete(app.copy_target_name)
 	delete(app.move_name)
 	delete(app.create_name)
@@ -183,6 +255,8 @@ app_destroy :: proc(app: ^App_State) {
 	delete(app.viewer_path)
 	delete(app.viewer_data)
 	delete(app.viewer_line_starts)
+	delete(app.viewer_formatted_data)
+	delete(app.viewer_formatted_line_starts)
 	delete(app.viewer_query)
 	delete(app.link_source)
 	delete(app.link_name)

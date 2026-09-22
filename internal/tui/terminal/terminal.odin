@@ -49,8 +49,17 @@ Event_Kind :: enum {
 	None,
 	Key,
 	Text,
+	Mouse,
 	Resize,
 	Appearance,
+}
+
+Mouse_Action :: enum {
+	Press,
+	Release,
+	Move,
+	Scroll_Up,
+	Scroll_Down,
 }
 
 Appearance :: enum {
@@ -73,6 +82,10 @@ Event :: struct {
 	size:              Size,
 	appearance:        Appearance,
 	appearance_source: Appearance_Source,
+	mouse_action: Mouse_Action,
+	mouse_button: int,
+	mouse_x: int,
+	mouse_y: int,
 }
 
 Session :: struct {
@@ -114,7 +127,7 @@ open :: proc(session: ^Session) -> bool {
 	session.pending_count = 0
 	session.active = true
 	session.size = terminal_size
-	write("\e[?1049h\e[?25l\e[2J\e[H\e[?2031h")
+	write("\e[?1049h\e[?25l\e[2J\e[H\e[?2031h\e[?1000h\e[?1002h\e[?1006h")
 	request_appearance(session)
 	return true
 }
@@ -131,7 +144,7 @@ close :: proc(session: ^Session) {
 		return
 	}
 
-	write("\e[?2031l\e[0m\e[?25h\e[?1049l")
+	write("\e[?1006l\e[?1002l\e[?1000l\e[?2031l\e[0m\e[?25h\e[?1049l")
 	posix.tcsetattr(STDIN, .TCSAFLUSH, &session.original_mode)
 	session.active = false
 }
