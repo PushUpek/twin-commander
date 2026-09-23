@@ -2,6 +2,7 @@ package commander
 
 import "core:fmt"
 import "core:os"
+import "core:path/filepath"
 import "core:strings"
 import "tc:internal/tui"
 
@@ -30,6 +31,29 @@ open_selected_file :: proc(
 		set_status(app, fmt.aprintf(tr("%s jest katalogiem"), file.name))
 		return
 	}
+	local_path := file.fullpath
+	temporary: string
+	remote_local_path: string
+	keep_temporary := false
+	defer {
+		if len(temporary) > 0 && !keep_temporary do os.remove_all(temporary)
+		delete(temporary)
+		delete(remote_local_path)
+	}
+	if panel.remote {
+		temp_err: os.Error
+		temporary, temp_err = os.make_directory_temp("", "twin-commander-remote-*", context.allocator)
+		if temp_err != nil {
+			set_status(app, strings.clone(tr("Nie można przygotować pliku tymczasowego")) or_else "")
+			return
+		}
+		remote_local_path = filepath.join({temporary, file.name}) or_else ""
+		local_path = remote_local_path
+		if !remote_transfer(file.fullpath, local_path, false) {
+			set_status(app, fmt.aprintf(tr("Nie można pobrać zdalnego pliku: %s"), file.name))
+			return
+		}
+	}
 
 	tool := strings.clone(external_tool(action)) or_else ""
 	defer delete(tool)
@@ -44,7 +68,7 @@ open_selected_file :: proc(
 	if action == .View {
 		script = "LESSSECURE=1; export LESSSECURE; exec $1 \"$2\""
 	}
-	command := []string{"/bin/sh", "-c", script, "twin-commander", tool, file.fullpath}
+	command := []string{"/bin/sh", "-c", script, "twin-commander", tool, local_path}
 
 	tui.suspend(ctx)
 	process, start_err := os.process_start(os.Process_Desc{
@@ -81,6 +105,11 @@ open_selected_file :: proc(
 	if action == .Edit {
 		selected_name := strings.clone(file.name) or_else ""
 		defer delete(selected_name)
+		if panel.remote && !remote_transfer(local_path, file.fullpath, false) {
+			keep_temporary = true
+			set_status(app, fmt.aprintf(tr("Nie można wysłać zmian; kopia lokalna: %s"), local_path))
+			return
+		}
 		if err := panel_refresh(panel); err != nil {
 			set_status(app, fmt.aprintf(tr("Nie można odświeżyć katalogu: %s"), os.error_string(err)))
 			return

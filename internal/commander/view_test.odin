@@ -71,7 +71,7 @@ dialog_action_hints_remain_visible_in_both_themes :: proc(t: ^testing.T) {
 		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 3)
 		tui.buffer_clear(&buffer)
 		draw_help_dialog(&buffer, 56, 24, theme)
-		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 1)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 2)
 		tui.buffer_clear(&buffer)
 		app.menu_kind = .User
 		draw_menu_dialog(&buffer, 56, 24, &app, theme)
@@ -98,7 +98,7 @@ dialog_action_hints_remain_visible_in_both_themes :: proc(t: ^testing.T) {
 		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 4)
 		tui.buffer_clear(&buffer)
 		draw_checksum_dialog(&buffer, 56, 24, &app, theme)
-		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 2)
+		testing.expect_value(t, count_visible_action_keys(&buffer, theme), 3)
 	}
 }
 

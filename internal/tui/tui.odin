@@ -6,6 +6,7 @@ import "core:strings"
 Event :: term.Event
 Event_Kind :: term.Event_Kind
 Key :: term.Key
+Modifiers :: term.Modifiers
 Appearance :: term.Appearance
 
 Context :: struct {

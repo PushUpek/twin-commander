@@ -13,19 +13,23 @@ USER_MENU_ITEMS: [8]string = {
 	"Wyszukiwanie",
 }
 
-MAIN_MENU_ITEMS: [12]string = {
+MAIN_MENU_ITEMS: [16]string = {
 	"Wyszukiwanie",
 	"Zakładki",
 	"Porównaj panele",
 	"Właściwości",
 	"Oblicz rozmiar",
 	"Utwórz link",
-	"Suma SHA-256",
+	"Suma kontrolna",
 	"Kopiuj w tle",
 	"Kolejka operacji",
 	"Wykonaj polecenie",
 	"Otwórz powłokę",
 	"Pomoc",
+	"Połącz SFTP/FTP",
+	"Porównaj rekurencyjnie",
+	"Synchronizuj do drugiego panelu",
+	"Zmień tryb panelu",
 }
 
 begin_menu :: proc(app: ^App_State, kind: Menu_Kind) {
@@ -79,6 +83,10 @@ activate_menu_item :: proc(ctx: ^tui.Context, app: ^App_State, running: ^bool, k
 	case 9: begin_command(app)
 	case 10: open_shell(ctx, app, running)
 	case 11: app.help_pending = true
+	case 12: begin_remote(app)
+	case 13: compare_recursive(app)
+	case 14: begin_sync(app)
+	case 15: panel_mode_cycle(app)
 	}
 }
 

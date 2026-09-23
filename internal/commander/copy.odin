@@ -49,6 +49,10 @@ clear_copy_edit :: proc(app: ^App_State) {
 }
 
 prepare_copy :: proc(ctx: ^tui.Context, app: ^App_State, target_name: string) {
+	if app.panels[0].remote || app.panels[1].remote {
+		remote_prepare_transfer(app, target_name, false)
+		return
+	}
 	entries, ok := copy_entries(app)
 	defer delete(entries)
 	if !ok do return
@@ -134,6 +138,10 @@ copy_destination :: proc(app: ^App_State, file: os.File_Info, target_name: strin
 }
 
 perform_copy :: proc(ctx: ^tui.Context, app: ^App_State, replace: bool, target_name: string = "") {
+	if app.panels[0].remote || app.panels[1].remote {
+		remote_perform_transfer(app, target_name, false)
+		return
+	}
 	entries, ok := copy_entries(app)
 	defer delete(entries)
 	if !ok do return

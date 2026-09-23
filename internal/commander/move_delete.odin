@@ -50,6 +50,10 @@ clear_move_edit :: proc(app: ^App_State) {
 }
 
 prepare_move :: proc(app: ^App_State, target_name: string, ctx: ^tui.Context = nil) {
+	if app.panels[0].remote || app.panels[1].remote {
+		remote_prepare_transfer(app, target_name, true)
+		return
+	}
 	entries, ok := move_entries(app)
 	defer delete(entries)
 	if !ok do return
@@ -137,6 +141,10 @@ path_is_inside :: proc(path, directory: string) -> bool {
 }
 
 perform_move :: proc(app: ^App_State, replace: bool, target_name: string = "", ctx: ^tui.Context = nil) {
+	if app.panels[0].remote || app.panels[1].remote {
+		remote_perform_transfer(app, target_name, true)
+		return
+	}
 	entries, ok := move_entries(app)
 	defer delete(entries)
 	if !ok do return
@@ -256,6 +264,10 @@ delete_entries :: proc(app: ^App_State) -> ([dynamic]os.File_Info, bool) {
 }
 
 perform_delete :: proc(app: ^App_State, ctx: ^tui.Context = nil) {
+	if app.panels[app.active_panel].remote {
+		remote_perform_delete(app)
+		return
+	}
 	entries, ok := delete_entries(app)
 	defer delete(entries)
 	if !ok do return
