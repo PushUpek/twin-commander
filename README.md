@@ -162,9 +162,11 @@ skróty; po zmianie przypisań obowiązuje plik konfiguracyjny.
 
 Interfejs ma dwa odrębne szablony kolorystyczne: Kanso Pearl dla trybu jasnego
 i Kanso Mist dla trybu ciemnego. Ich definicje TOML znajdują się w
-`config/themes/` w plikach z prefiksami `light_` i `dark_`. Domyślne motywy są dołączone do programu podczas budowania, więc działają także
-po uruchomieniu z innego katalogu. Własne motywy są wczytywane z pliku przy
-uruchomieniu. Program
+`config/themes/` w plikach z prefiksami `light_` i `dark_`. Aplikacja wczytuje
+domyślne i własne motywy z plików TOML przy uruchomieniu, bez rekompilacji.
+Domyślnych plików szuka w `config/themes/` względem bieżącego katalogu, a potem
+w katalogu `config/themes/` obok katalogu z binarką. Przy przenoszeniu binarki
+trzeba przenieść również katalog `config/themes/`. Program
 korzysta z raportów preferencji systemowej `CSI ? 996 n` i powiadomień trybu
 `2031`, aby przełączać motyw od razu po zmianie ustawień. Dla starszych
 terminali okresowo odczytuje kolor tła przez OSC 11. Terminale bez obsługi obu
@@ -207,8 +209,9 @@ TWIN_COMMANDER_LIGHT_THEME=/pełna/ścieżka/moj_jasny.toml make run
 Automatyczne przełączanie jasny/ciemny dalej działa. Aby wymusić wariant,
 dodaj `TWIN_COMMANDER_THEME=dark` lub `light`. Dostępne sekcje i pola pokazują
 pełne definicje w `config/themes/`. Kolory zapisujemy jako `"#RRGGBB"`, a atrybuty
-`bold`, `dim`, `underline` jako `true` lub `false`. Niepoprawny plik powoduje
-ostrzeżenie i użycie domyślnego Kanso. Zmiany plików wymagają ponownego uruchomienia.
+`bold`, `dim`, `underline` jako `true` lub `false`. Niepoprawny plik własnego motywu powoduje
+ostrzeżenie i użycie domyślnego Kanso. Zmiany plików wymagają ponownego uruchomienia,
+ale nie rekompilacji.
 Ścieżki względne liczone są od bieżącego katalogu; poza projektem użyj pełnych ścieżek.
 
 Tłumaczenia są zwykłymi plikami JSON UTF-8 w `config/locales/`.
@@ -250,8 +253,8 @@ tłumaczenia zmieniają ich opisy. Krótkie etykiety mieszczą się lepiej w wą
 ## Architektura
 
 Punkty wejścia programów znajdują się w `cmd/`, a kod współdzielony w
-`internal/`. Główna aplikacja jest podzielona na pakiety `commander`, `fsops`
-i `tui`. Kod zależny od POSIX pozostaje odizolowany w `internal/tui/terminal/`.
+`pkg/`. Główna aplikacja jest podzielona na pakiety `commander`, `themes`,
+`fsops` i `tui`. Kod zależny od POSIX pozostaje odizolowany w `pkg/tui/terminal/`.
 
 Testy pakietu można uruchomić poleceniem:
 
