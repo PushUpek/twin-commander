@@ -9,8 +9,8 @@ all: build
 
 build: $(TARGET)
 
-ODIN_SOURCES := $(shell find cmd internal -name '*.odin')
-CONFIG_SOURCES := $(shell find config -name '*.toml' -o -name '*.json')
+ODIN_SOURCES := $(shell find cmd pkg -name '*.odin')
+CONFIG_SOURCES := $(shell find config -name '*.json')
 
 $(TARGET): $(ODIN_SOURCES) $(CONFIG_SOURCES)
 	mkdir -p $(BUILD_DIR)
@@ -18,11 +18,11 @@ $(TARGET): $(ODIN_SOURCES) $(CONFIG_SOURCES)
 
 .PHONY: test
 test:
-	$(ODIN) test ./internal/tui $(ODIN_FLAGS)
-	$(ODIN) test ./internal/tui/terminal $(ODIN_FLAGS)
-	$(ODIN) test ./internal/fsops $(ODIN_FLAGS)
-	$(ODIN) test ./internal/commander/themes $(ODIN_FLAGS)
-	$(ODIN) test ./internal/commander $(ODIN_FLAGS)
+	$(ODIN) test ./pkg/tui $(ODIN_FLAGS)
+	$(ODIN) test ./pkg/tui/terminal $(ODIN_FLAGS)
+	$(ODIN) test ./pkg/fsops $(ODIN_FLAGS)
+	$(ODIN) test ./pkg/themes $(ODIN_FLAGS)
+	$(ODIN) test ./pkg/commander $(ODIN_FLAGS)
 
 run: build
 	./$(TARGET)
