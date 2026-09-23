@@ -9,6 +9,11 @@ import "tc:internal/fsops"
 panel_destroy :: proc(panel: ^Panel_State) {
 	if len(panel.archive_root) > 0 do os.remove_all(filepath.dir(panel.archive_root))
 	delete(panel.path)
+	delete(panel.remote_return_path)
+	for path in panel.tree_paths do delete(path)
+	delete(panel.tree_paths)
+	delete(panel.preview_path)
+	delete(panel.preview_data)
 	if panel.files != nil {
 		os.file_info_slice_delete(panel.files, context.allocator)
 	}
@@ -38,7 +43,14 @@ panel_load :: proc(panel: ^Panel_State, path: string, record_history := true) ->
 		sort_kind = panel.sort_kind,
 		reverse = panel.sort_reverse,
 	}
-	absolute_path, files, load_err := fsops.Load_Directory(path, context.allocator, options)
+	absolute_path: string
+	files: []os.File_Info
+	load_err: os.Error
+	if remote_path_valid(path) {
+		absolute_path, files, load_err = remote_load_directory(path, options)
+	} else {
+		absolute_path, files, load_err = fsops.Load_Directory(path, context.allocator, options)
+	}
 	if load_err != nil {
 		return load_err
 	}
@@ -55,6 +67,7 @@ panel_load :: proc(panel: ^Panel_State, path: string, record_history := true) ->
 	}
 	if !same_path do panel_clear_marks(panel)
 	panel.path = absolute_path
+	panel.remote = remote_path_valid(absolute_path)
 	panel.files = files
 	update_panel_space(panel)
 	panel.selected = 0
@@ -66,6 +79,7 @@ panel_load :: proc(panel: ^Panel_State, path: string, record_history := true) ->
 	if record_history && !same_path {
 		panel_record_history(panel, panel.path)
 	}
+	if panel.mode == .Tree do panel_tree_refresh(panel)
 	return nil
 }
 

@@ -67,6 +67,26 @@ foreground = "#22262D"
 background = "#7FB4CA"
 bold = true
 
+[viewer_json_key]
+foreground = "#7FB4CA"
+background = "#2A2C35"
+
+[viewer_json_string]
+foreground = "#B8C0A2"
+background = "#2A2C35"
+
+[viewer_json_number]
+foreground = "#DCA561"
+background = "#2A2C35"
+
+[viewer_json_literal]
+foreground = "#C4746E"
+background = "#2A2C35"
+
+[viewer_json_punctuation]
+foreground = "#A58BBE"
+background = "#2A2C35"
+
 [progress_track]
 background = "#43464E"
 

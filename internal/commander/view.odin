@@ -29,18 +29,18 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	footer_height := 2
 	left_width := width / 2
 	panel_height := height - footer_height
-	draw_panel(
+	draw_panel_mode(
 		buffer,
 		tui.Rect{x = 0, y = 0, width = left_width, height = panel_height},
-		&app.panels[0],
-		app.active_panel == 0,
+		app,
+		0,
 		theme,
 	)
-	draw_panel(
+	draw_panel_mode(
 		buffer,
 		tui.Rect{x = left_width, y = 0, width = width - left_width, height = panel_height},
-		&app.panels[1],
-		app.active_panel == 1,
+		app,
+		1,
 		theme,
 	)
 
@@ -101,9 +101,16 @@ draw :: proc(ctx: ^tui.Context, app: ^App_State) {
 	} else if app.background_pending {
 		draw_background_dialog(buffer, width, height, app, theme)
 	} else if app.help_pending {
-		draw_help_dialog(buffer, width, height, theme)
+		draw_help_dialog(buffer, width, height, theme, app.help_offset)
 	} else if app.menu_kind != .None {
 		draw_menu_dialog(buffer, width, height, app, theme)
+	} else if app.remote_edit_pending {
+		draw_name_edit_dialog(buffer, width, height, app.remote_text, app.remote_cursor,
+			tr("Połącz SFTP/FTP"), tr("Enter Połącz"), theme,
+			tr("Zdalny katalog skonfigurowany w rclone (nazwa:ścieżka):"),
+			tr("Wymaga zainstalowanego rclone i skonfigurowanego SFTP/FTP"))
+	} else if app.sync_pending {
+		draw_sync_dialog(buffer, width, height, app, theme)
 	} else if app.command_edit_pending {
 		draw_name_edit_dialog(buffer, width, height, app.command_text, app.command_cursor,
 			tr("Polecenie powłoki"), tr("Enter Wykonaj"), theme,
@@ -271,7 +278,15 @@ draw_properties_dialog :: proc(
 	dialog_write(dialog, 16, tr(" Enter Zapisz   Esc Anuluj "), .Action)
 }
 
-draw_help_dialog :: proc(buffer: ^tui.Buffer, width, height: int, theme: Theme) {
+HELP_LINE_COUNT :: 23
+
+help_max_offset :: proc(ctx: ^tui.Context) -> int {
+	_, height := tui.size(ctx)
+	dialog_height := min(HELP_LINE_COUNT + 4, height - 2)
+	return max(HELP_LINE_COUNT - max(dialog_height - 3, 0), 0)
+}
+
+draw_help_dialog :: proc(buffer: ^tui.Buffer, width, height: int, theme: Theme, offset := 0) {
 	lines := []string{
 		tr("Nawigacja"),
 		tr("  Tab / ↑↓    panel / zaznaczenie"),
@@ -284,7 +299,7 @@ draw_help_dialog :: proc(buffer: ^tui.Buffer, width, height: int, theme: Theme) 
 		tr("  Alt-F7 / ^G szukaj; Tab: nazwa / treść"),
 		tr("  ^P / ^B     właściwości / zakładki"),
 		tr("  ^Q / ^U     porównaj / oblicz rozmiar"),
-		tr("  ^K / ^L     suma SHA-256 / utwórz link"),
+		tr("  ^K / ^L     suma kontrolna / utwórz link"),
 		tr("Powłoka i widok"),
 		tr("  : / ^O      polecenie / powłoka"),
 		tr("  ^J / ^T     kopiuj w tle / kolejka"),
@@ -292,17 +307,23 @@ draw_help_dialog :: proc(buffer: ^tui.Buffer, width, height: int, theme: Theme) 
 		tr("  ^R / ^S     odśwież / zmień sortowanie"),
 		tr("  + \\ *       oznacz / odznacz / odwróć"),
 		tr("  Esc / F10   zakończ program"),
+		tr("Etap 5"),
+		tr("  F11 / F12   tryb panelu / porównaj rekurencyjnie"),
+		tr("  ^Y / ^N     synchronizuj / połącz SFTP/FTP"),
+		tr("  Mysz        wybór, podwójny klik, przewijanie"),
 	}
 	dialog_height := min(len(lines) + 4, height - 2)
 	dialog := dialog_open(buffer, width, height, dialog_height, tr("Pomoc Twin Commander"), theme)
 	visible_lines := min(len(lines), max(dialog_height - 3, 0))
-	for index in 0 ..< visible_lines {
+	start_offset := clamp(offset, 0, max(len(lines) - visible_lines, 0))
+	for row in 0 ..< visible_lines {
+		index := start_offset + row
 		line := lines[index]
 		role := Dialog_Text_Role.Body
-		if index == 0 || index == 3 || index == 7 || index == 12 do role = .Accent
-		dialog_write(dialog, 1 + index, line, role)
+		if index == 0 || index == 3 || index == 7 || index == 12 || index == 19 do role = .Accent
+		dialog_write(dialog, 1 + row, line, role)
 	}
-	dialog_write(dialog, dialog_height - 2, tr(" Enter/Esc Zamknij "), .Action)
+	dialog_write(dialog, dialog_height - 2, tr(" ↑↓ Przewiń   Enter/Esc Zamknij "), .Action)
 }
 
 draw_menu_dialog :: proc(buffer: ^tui.Buffer, width, height: int, app: ^App_State, theme: Theme) {
@@ -312,15 +333,18 @@ draw_menu_dialog :: proc(buffer: ^tui.Buffer, width, height: int, app: ^App_Stat
 		title = tr("Menu użytkownika")
 		count = len(USER_MENU_ITEMS)
 	}
-	dialog_height := count + 4
+	dialog_height := min(count + 4, height - 2)
 	dialog := dialog_open(buffer, width, height, dialog_height, title, theme)
-	for index in 0 ..< count {
+	visible := max(dialog_height - 3, 1)
+	offset := max(app.menu_selected - visible + 1, 0)
+	for row in 0 ..< min(visible, count - offset) {
+		index := offset + row
 		item := menu_item(app.menu_kind, index)
 		style := theme.dialog_surface
 		if index == app.menu_selected do style = theme.dialog_accent
-		tui.buffer_fill(buffer, tui.Rect{x = dialog.rect.x + 2, y = dialog.rect.y + 1 + index,
+		tui.buffer_fill(buffer, tui.Rect{x = dialog.rect.x + 2, y = dialog.rect.y + 1 + row,
 			width = dialog.rect.width - 4, height = 1}, tui.Cell{character = ' ', style = style})
-		tui.buffer_write(buffer, dialog.rect.x + 3, dialog.rect.y + 1 + index, tr(item), style, dialog.rect.width - 6)
+		tui.buffer_write(buffer, dialog.rect.x + 3, dialog.rect.y + 1 + row, tr(item), style, dialog.rect.width - 6)
 	}
 	dialog_write(dialog, dialog_height - 2, tr(" Enter Wybierz   Esc Zamknij "), .Action)
 }

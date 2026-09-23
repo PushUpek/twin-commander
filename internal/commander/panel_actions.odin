@@ -108,6 +108,10 @@ handle_mark_edit_event :: proc(app: ^App_State, event: tui.Event) {
 
 navigate_parent :: proc(app: ^App_State) {
 	panel := &app.panels[app.active_panel]
+	if panel.remote {
+		if remote_leave(panel) do set_status(app, fmt.aprintf(tr("Katalog: %s"), panel.path))
+		return
+	}
 	if leave_archive(panel) {
 		set_status(app, fmt.aprintf(tr("Katalog: %s"), panel.path))
 		return

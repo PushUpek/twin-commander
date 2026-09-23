@@ -2,6 +2,7 @@ package tui_terminal
 
 import "core:bytes"
 import "core:strconv"
+import "core:strings"
 import "core:unicode/utf8"
 
 parse_pending :: proc(session: ^Session) -> (Event, bool) {
@@ -11,6 +12,17 @@ parse_pending :: proc(session: ^Session) -> (Event, bool) {
 
 	data := session.pending[:session.pending_count]
 	first := data[0]
+	if len(data) >= 3 && first == 0x1b && data[1] == '[' && data[2] == '<' {
+		event, consumed, complete := parse_sgr_mouse(data)
+		if !complete {
+			previous_count := session.pending_count
+			read_pending(session, 8)
+			if session.pending_count > previous_count do return parse_pending(session)
+			return {}, false
+		}
+		consume_pending(session, consumed)
+		return event, event.kind == .Mouse
+	}
 
 	if len(data) >= 3 && first == 0x1b && data[1] == '[' && data[2] == '?' {
 		event, consumed, recognized, complete := parse_appearance_report(data)
@@ -48,6 +60,13 @@ parse_pending :: proc(session: ^Session) -> (Event, bool) {
 			consume_pending(session, consumed)
 			return event, true
 		}
+		if len(data) >= 2 && data[1] != '[' && data[1] != ']' && data[1] != 'O' && data[1] >= ' ' {
+			decoded, width := utf8.decode_rune(data[1:])
+			if width > 0 && 1 + width <= len(data) {
+				consume_pending(session, 1 + width)
+				return Event{kind = .Text, text = decoded, modifiers = {.Alt}}, true
+			}
+		}
 
 		// Give a terminal a brief chance to finish a split escape sequence.
 		if session.pending_count == 1 && read_pending(session, 8) {
@@ -81,6 +100,36 @@ parse_pending :: proc(session: ^Session) -> (Event, bool) {
 	}
 	consume_pending(session, width)
 	return Event{kind = .Text, text = decoded}, true
+}
+
+parse_sgr_mouse :: proc(data: []u8) -> (Event, int, bool) {
+	end := 3
+	for end < len(data) && data[end] != 'M' && data[end] != 'm' do end += 1
+	if end >= len(data) do return {}, 0, false
+	remaining := string(data[3:end])
+	fields: [3]u64
+	field_index := 0
+	for field in strings.split_iterator(&remaining, ";") {
+		if field_index >= 3 do return {}, end + 1, true
+		value, ok := strconv.parse_u64(field)
+		if !ok do return {}, end + 1, true
+		fields[field_index] = value
+		field_index += 1
+	}
+	if field_index != 3 || fields[1] == 0 || fields[2] == 0 do return {}, end + 1, true
+	button_code := int(fields[0])
+	event := Event{kind = .Mouse, mouse_button = button_code & 3,
+		mouse_x = int(fields[1]) - 1, mouse_y = int(fields[2]) - 1}
+	if button_code & 64 != 0 {
+		event.mouse_action = .Scroll_Up if button_code & 1 == 0 else .Scroll_Down
+	} else if data[end] == 'm' {
+		event.mouse_action = .Release
+	} else if button_code & 32 != 0 {
+		event.mouse_action = .Move
+	} else {
+		event.mouse_action = .Press
+	}
+	return event, end + 1, true
 }
 
 parse_appearance_report :: proc(data: []u8) -> (Event, int, bool, bool) {
@@ -206,6 +255,7 @@ scaled_hex :: proc(value: []u8) -> (int, bool) {
 }
 
 parse_escape :: proc(data: []u8) -> (Event, int, bool) {
+	if event, consumed, ok := parse_modified_function_key(data); ok do return event, consumed, true
 	alt_f7_text: string = "\e[18;3~"
 	alt_f7 := transmute([]u8)alt_f7_text
 	if len(data) >= len(alt_f7) && bytes.equal(data[:len(alt_f7)], alt_f7) {
@@ -256,4 +306,51 @@ parse_escape :: proc(data: []u8) -> (Event, int, bool) {
 	}
 
 	return {}, 0, false
+}
+
+parse_modified_function_key :: proc(data: []u8) -> (Event, int, bool) {
+	if len(data) < 6 || data[0] != 0x1b || data[1] != '[' do return {}, 0, false
+	semi := -1
+	end := -1
+	for index in 2 ..< len(data) {
+		if data[index] == ';' do semi = index
+		if data[index] == '~' || data[index] == 'P' || data[index] == 'Q' || data[index] == 'R' || data[index] == 'S' {
+			end = index
+			break
+		}
+	}
+	if semi < 0 || end < 0 || semi >= end do return {}, 0, false
+	modifier, mod_ok := strconv.parse_u64(string(data[semi + 1:end]))
+	if !mod_ok || modifier < 2 || modifier > 8 do return {}, 0, false
+	key: Key
+	if data[end] == '~' {
+		code, code_ok := strconv.parse_u64(string(data[2:semi]))
+		if !code_ok do return {}, 0, false
+		switch code {
+		case 15: key = .F5
+		case 17: key = .F6
+		case 18: key = .F7
+		case 19: key = .F8
+		case 20: key = .F9
+		case 21: key = .F10
+		case 23: key = .F11
+		case 24: key = .F12
+		case: return {}, 0, false
+		}
+	} else {
+		if string(data[2:semi]) != "1" do return {}, 0, false
+		switch data[end] {
+		case 'P': key = .F1
+		case 'Q': key = .F2
+		case 'R': key = .F3
+		case 'S': key = .F4
+		case: return {}, 0, false
+		}
+	}
+	bits := int(modifier) - 1
+	modifiers: Modifiers
+	if bits & 1 != 0 do modifiers += {.Shift}
+	if bits & 2 != 0 do modifiers += {.Alt}
+	if bits & 4 != 0 do modifiers += {.Control}
+	return Event{kind = .Key, key = key, modifiers = modifiers}, end + 1, true
 }
