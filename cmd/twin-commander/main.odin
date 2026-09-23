@@ -1,6 +1,6 @@
 package main
 
-import "tc:internal/commander"
+import "tc:pkg/commander"
 
 main :: proc() {
 	commander.Run()
