@@ -36,6 +36,10 @@ load_default_theme :: proc(filename: string, allocator: runtime.Allocator) -> (T
 	// The build directory sits beside config in the project tree.
 	executable_dir, err := os.get_executable_directory(context.temp_allocator)
 	if err != nil { return {}, false }
+	path = filepath.join({executable_dir, "..", "share", "twin-commander", "themes", filename}, context.temp_allocator) or_else ""
+	if len(path) > 0 {
+		if theme, ok := themes.load_theme_file(path, allocator); ok { return theme, true }
+	}
 	path = filepath.join({executable_dir, "..", "config", "themes", filename}, context.temp_allocator) or_else ""
 	if len(path) == 0 { return {}, false }
 	return themes.load_theme_file(path, allocator)

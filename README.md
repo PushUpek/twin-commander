@@ -12,6 +12,42 @@ make
 
 Program zostanie zbudowany w katalogu `build/`.
 
+## Paczki i wydania
+
+Workflow `Build packages` uruchamia testy na macOS ARM, macOS Intel i Linux x86-64.
+Tag `vX.Y.Z` publikuje w GitHub Releases:
+
+- `twin-commander-macos-arm64.tar.gz` — Apple Silicon,
+- `twin-commander-macos-universal.tar.gz` — Apple Silicon i Intel,
+- `.AppImage`, `.deb` i `.rpm` dla Linux x86-64,
+- `SHA256SUMS` do sprawdzenia pobranych plików.
+
+Archiwa macOS zawierają `bin/twin-commander` oraz `share/twin-commander/themes`.
+Po rozpakowaniu można uruchomić `bin/twin-commander` z interaktywnego terminala.
+Na macOS pobrane binarki nie są jeszcze podpisane ani notarizowane.
+
+Homebrew może zbudować bieżącą wersję z gałęzi `main`:
+
+```sh
+brew tap pushupek/twin-commander https://github.com/PushUpek/twin-commander.git
+brew install --HEAD pushupek/twin-commander/twin-commander
+```
+
+Formuła używa kompilatora `odin` z Homebrew. Nie ma jeszcze wersjonowanej
+formuły ani osobnego repozytorium tap z automatycznymi aktualizacjami.
+
+Na Debianie/Ubuntu można zainstalować pobrane `.deb` przez `sudo apt install ./plik.deb`.
+Na systemie z RPM można zainstalować pobrane `.rpm` przez `sudo dnf install ./plik.rpm`.
+Te pliki nie tworzą jeszcze podpisanego repozytorium APT ani DNF, więc nie zapewniają
+automatycznych aktualizacji. AppImage jest plikiem wykonywalnym do uruchomienia
+z terminala; integracja z pulpitem wymaga środowiska obsługującego AppImage.
+
+Wydania Windows (`.exe`, `.zip`, instalator) wymagają najpierw portu warstwy
+terminala i użytych operacji POSIX na Windows. Obecny kod nie buduje się tam
+natywnie, dlatego workflow nie publikuje pozornego pliku Windows. Po porcie
+najprostszy zestaw to przenośny `.zip` i instalator Inno Setup; pojedynczy
+`.exe` można dołączyć jako część obu.
+
 ## Uruchamianie
 
 ```sh
@@ -165,8 +201,8 @@ i Kanso Mist dla trybu ciemnego. Ich definicje TOML znajdują się w
 `config/themes/` w plikach z prefiksami `light_` i `dark_`. Aplikacja wczytuje
 domyślne i własne motywy z plików TOML przy uruchomieniu, bez rekompilacji.
 Domyślnych plików szuka w `config/themes/` względem bieżącego katalogu, a potem
-w katalogu `config/themes/` obok katalogu z binarką. Przy przenoszeniu binarki
-trzeba przenieść również katalog `config/themes/`. Program
+w `share/twin-commander/themes/` lub `config/themes/` obok katalogu z binarką.
+Przy przenoszeniu binarki trzeba przenieść również katalog motywów. Program
 korzysta z raportów preferencji systemowej `CSI ? 996 n` i powiadomień trybu
 `2031`, aby przełączać motyw od razu po zmianie ustawień. Dla starszych
 terminali okresowo odczytuje kolor tła przez OSC 11. Terminale bez obsługi obu

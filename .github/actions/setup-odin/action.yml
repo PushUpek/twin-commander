@@ -1,0 +1,30 @@
+name: Set up Odin
+description: Download the pinned Odin compiler for this runner
+inputs:
+  platform:
+    required: true
+    description: linux or macos
+  arch:
+    required: true
+    description: amd64 or arm64
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        ODIN_PLATFORM: ${{ inputs.platform }}
+        ODIN_ARCH: ${{ inputs.arch }}
+      run: |
+        set -euo pipefail
+        version=dev-2026-09
+        archive="odin-${ODIN_PLATFORM}-${ODIN_ARCH}-${version}.tar.gz"
+        mkdir -p "$RUNNER_TEMP/odin"
+        curl --fail --location --retry 3 \
+          "https://github.com/odin-lang/Odin/releases/download/${version}/${archive}" \
+          --output "$RUNNER_TEMP/odin.tar.gz"
+        tar -xzf "$RUNNER_TEMP/odin.tar.gz" -C "$RUNNER_TEMP/odin"
+        compiler=$(find "$RUNNER_TEMP/odin" -type f -name odin -print -quit)
+        test -n "$compiler"
+        chmod +x "$compiler"
+        echo "$(dirname "$compiler")" >> "$GITHUB_PATH"
+        "$compiler" version
