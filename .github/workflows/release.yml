@@ -68,7 +68,7 @@ jobs:
           chmod +x arm64/bin/twin-commander amd64/bin/twin-commander
           cp -R arm64/share/twin-commander/themes universal/share/twin-commander/
           lipo -create arm64/bin/twin-commander amd64/bin/twin-commander -output universal/bin/twin-commander
-          lipo -verify_arch arm64 x86_64 universal/bin/twin-commander
+          lipo universal/bin/twin-commander -verify_arch arm64 x86_64
           tar -C arm64 -czf dist/twin-commander-macos-arm64.tar.gz bin share
           tar -C universal -czf dist/twin-commander-macos-universal.tar.gz bin share
       - uses: actions/upload-artifact@v4
