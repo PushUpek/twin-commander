@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Twin Commander
+Comment=Two-panel file manager
+Exec=twin-commander
+Icon=twin-commander
+Terminal=true
+Categories=Utility;FileManager;

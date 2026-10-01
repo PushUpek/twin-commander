@@ -1,0 +1,126 @@
+name: Build packages
+
+on:
+  pull_request:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            runner: macos-15
+            platform: macos
+            arch: arm64
+          - name: macos-amd64
+            runner: macos-15-intel
+            platform: macos
+            arch: amd64
+          - name: linux-amd64
+            runner: ubuntu-22.04
+            platform: linux
+            arch: amd64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-odin
+        with:
+          platform: ${{ matrix.platform }}
+          arch: ${{ matrix.arch }}
+      - name: Test and build
+        run: |
+          make test
+          make build
+          mkdir -p stage/bin stage/share/twin-commander
+          cp build/twin-commander stage/bin/
+          cp -R config/themes stage/share/twin-commander/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage-${{ matrix.name }}
+          path: stage/
+          if-no-files-found: error
+          retention-days: 7
+
+  macos:
+    needs: build
+    runs-on: macos-15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: stage-macos-arm64
+          path: arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: stage-macos-amd64
+          path: amd64
+      - name: Create macOS downloads
+        run: |
+          set -euo pipefail
+          mkdir -p dist universal/bin universal/share/twin-commander
+          chmod +x arm64/bin/twin-commander amd64/bin/twin-commander
+          cp -R arm64/share/twin-commander/themes universal/share/twin-commander/
+          lipo -create arm64/bin/twin-commander amd64/bin/twin-commander -output universal/bin/twin-commander
+          lipo universal/bin/twin-commander -verify_arch arm64 x86_64
+          tar -C arm64 -czf dist/twin-commander-macos-arm64.tar.gz bin share
+          tar -C universal -czf dist/twin-commander-macos-universal.tar.gz bin share
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-macos
+          path: dist/
+          if-no-files-found: error
+
+  linux:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: stage-linux-amd64
+          path: stage
+      - name: Install RPM packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+      - name: Create Linux packages
+        env:
+          VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0' }}
+        run: bash packaging/linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-linux
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, linux]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: dist
+          merge-multiple: true
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          sha256sum dist/* > dist/SHA256SUMS
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --generate-notes
+          fi
+          gh release upload "$TAG" dist/* --clobber
