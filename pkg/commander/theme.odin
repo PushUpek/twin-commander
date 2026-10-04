@@ -29,6 +29,34 @@ load_theme :: proc(mode: Theme_Mode, allocator: runtime.Allocator) -> (Theme, bo
 }
 
 load_default_theme :: proc(filename: string, allocator: runtime.Allocator) -> (Theme, bool) {
+	return load_default_theme_from_user_dir(filename, user_themes_directory(), allocator)
+}
+
+load_default_theme_from_user_dir :: proc(
+	filename, user_themes_dir: string,
+	allocator: runtime.Allocator,
+) -> (Theme, bool) {
+	base, base_ok := load_bundled_theme(filename, allocator)
+	if len(user_themes_dir) == 0 do return base, base_ok
+	path := filepath.join({user_themes_dir, filename}, context.temp_allocator) or_else ""
+	if len(path) == 0 do return base, base_ok
+	info, err := os.stat(path, context.temp_allocator)
+	if err != nil do return base, base_ok
+	os.file_info_delete(info, context.temp_allocator)
+	if base_ok {
+		custom, ok := themes.load_theme_file(path, allocator, base)
+		if ok {
+			themes.theme_destroy(&base)
+			return custom, true
+		}
+	} else {
+		if custom, ok := themes.load_theme_file(path, allocator); ok do return custom, true
+	}
+	fmt.eprintf("Invalid theme file %s; using bundled default\n", path)
+	return base, base_ok
+}
+
+load_bundled_theme :: proc(filename: string, allocator: runtime.Allocator) -> (Theme, bool) {
 	path := filepath.join({"config", "themes", filename}, context.temp_allocator) or_else ""
 	if len(path) > 0 {
 		if theme, ok := themes.load_theme_file(path, allocator); ok { return theme, true }

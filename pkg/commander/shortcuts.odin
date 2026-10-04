@@ -3,7 +3,6 @@ package commander
 import "core:encoding/json"
 import "core:fmt"
 import "core:os"
-import "core:path/filepath"
 import "core:strings"
 import "tc:pkg/tui"
 
@@ -101,10 +100,7 @@ shortcut_load :: proc(app: ^App_State) {
 		if ok do append(&app.shortcuts, binding)
 	}
 	path := os.get_env("TWIN_COMMANDER_SHORTCUTS_FILE", context.temp_allocator)
-	if len(path) == 0 {
-		config_dir, err := os.user_config_dir(context.temp_allocator)
-		if err == nil do path = filepath.join({config_dir, "twin-commander", "shortcuts.json"}, context.temp_allocator) or_else ""
-	}
+	if len(path) == 0 do path = user_config_file("shortcuts.json")
 	if len(path) == 0 do return
 	data, read_err := os.read_entire_file(path, context.temp_allocator)
 	if read_err != nil do return
