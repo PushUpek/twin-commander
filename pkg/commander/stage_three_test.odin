@@ -36,6 +36,7 @@ bookmarks_are_saved_and_loaded_from_config_file :: proc(t: ^testing.T) {
 	defer os.remove_all(root)
 	store := filepath.join({root, "config", "bookmarks"}) or_else ""
 	defer delete(store)
+	testing.expect(t, os.make_directory_all(filepath.dir(store)) == nil)
 
 	first: App_State
 	defer app_destroy(&first)

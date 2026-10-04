@@ -13,10 +13,7 @@ associations_load :: proc(app: ^App_State) {
 		association_set(app, extension, command)
 	}
 	path := os.get_env("TWIN_COMMANDER_ASSOCIATIONS_FILE", context.temp_allocator)
-	if len(path) == 0 {
-		config_dir, err := os.user_config_dir(context.temp_allocator)
-		if err == nil do path = filepath.join({config_dir, "twin-commander", "associations"}, context.temp_allocator) or_else ""
-	}
+	if len(path) == 0 do path = user_config_file("associations")
 	if len(path) == 0 do return
 	data, err := os.read_entire_file(path, context.temp_allocator)
 	if err != nil do return
