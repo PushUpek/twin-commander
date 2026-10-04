@@ -30,7 +30,7 @@ jobs:
             arch: amd64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-odin
         with:
           platform: ${{ matrix.platform }}
@@ -42,7 +42,7 @@ jobs:
           mkdir -p stage/bin stage/share/twin-commander
           cp build/twin-commander stage/bin/
           cp -R config/themes stage/share/twin-commander/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: stage-${{ matrix.name }}
           path: stage/
@@ -53,11 +53,11 @@ jobs:
     needs: build
     runs-on: macos-15
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: stage-macos-arm64
           path: arm64
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: stage-macos-amd64
           path: amd64
@@ -71,7 +71,7 @@ jobs:
           lipo universal/bin/twin-commander -verify_arch arm64 x86_64
           tar -C arm64 -czf dist/twin-commander-macos-arm64.tar.gz bin share
           tar -C universal -czf dist/twin-commander-macos-universal.tar.gz bin share
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: packages-macos
           path: dist/
@@ -81,8 +81,8 @@ jobs:
     needs: build
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
         with:
           name: stage-linux-amd64
           path: stage
@@ -94,7 +94,7 @@ jobs:
         env:
           VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0' }}
         run: bash packaging/linux.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: packages-linux
           path: dist/
@@ -107,7 +107,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: packages-*
           path: dist
