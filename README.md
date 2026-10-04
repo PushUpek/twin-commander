@@ -42,6 +42,20 @@ Windows releases (`.exe`, `.zip`, and an installer) require a Windows port of th
 make run
 ```
 
+## Configuration locations
+
+On macOS and other Unix systems, Twin Commander prefers an existing `~/.config/twin-commander/` directory. Create it to keep user configuration in one place:
+
+```sh
+mkdir -p ~/.config/twin-commander/themes
+```
+
+The directory contains `bookmarks`, `associations`, and `shortcuts.json`. Default theme overrides go in `themes/dark_kanso_mist.toml` and `themes/light_kanso_pearl.toml`. Either theme file may contain only the fields that differ from the bundled theme. A missing theme file falls back to the bundled version.
+
+If `~/.config/twin-commander/` does not exist, configuration files use the previous location returned by Odin's `os.user_config_dir`: `~/Library/Application Support/twin-commander/` on macOS, or the XDG configuration directory on Linux. Themes then use the previous project or installed-file lookup. Existing files are not moved automatically. Explicit `TWIN_COMMANDER_*_FILE` and theme-path environment variables still take precedence.
+
+For a future native Windows port, the configuration root is the user's local AppData directory under `twin-commander/`. The current application still requires POSIX and does not run natively on Windows.
+
 Each panel shows the contents of its own directory. The first column uses portable Unicode icons for directories and common file categories, including code, text, images, archives, media, and data. A Nerd Font is not required.
 
 Keyboard shortcuts:
@@ -92,7 +106,7 @@ Commands run through `:` display their normal terminal output and exit status. T
 
 Press `Enter` on a `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`, `.tar.xz`, or `.txz` archive to open it as a temporary read-only panel. Files can be copied from there to the other panel. Archive support uses `tar` and `unzip` and rejects absolute paths and `..` entries before extraction.
 
-By default, PDFs, images, and media files are opened with the system `open` command on macOS or `xdg-open` on other systems. Custom associations can be saved in `twin-commander/associations` in the user's configuration directory or specified with `TWIN_COMMANDER_ASSOCIATIONS_FILE`:
+By default, PDFs, images, and media files are opened with the system `open` command on macOS or `xdg-open` on other systems. Custom associations can be saved in `~/.config/twin-commander/associations` when that directory exists, or specified with `TWIN_COMMANDER_ASSOCIATIONS_FILE`:
 
 ```text
 .pdf = "zathura"
@@ -105,7 +119,7 @@ During copying, a floating window shows progress as a percentage. If an item wit
 
 Copying and cross-filesystem moves can be interrupted with `Esc` or `Ctrl-C`. After an error, the current item can be retried, skipped, or the whole operation can be cancelled. Symbolic links are copied, moved, and deleted as links without modifying their targets.
 
-Search covers subdirectories and respects the hidden-file setting. Results are limited to 5,000 items; content search skips binary files and files larger than 8 MiB. Bookmarks are stored in the user's configuration directory; their location can be overridden with `TWIN_COMMANDER_BOOKMARKS_FILE`. The regular panel comparison checks only the current, unexpanded contents of each panel and considers directories with the same name and type to match. The separate recursive comparison (`F12`) checks path, type, size, and modification date when available. It does not compare file contents byte for byte.
+Search covers subdirectories and respects the hidden-file setting. Results are limited to 5,000 items; content search skips binary files and files larger than 8 MiB. Bookmarks are stored in the selected configuration directory; their location can be overridden with `TWIN_COMMANDER_BOOKMARKS_FILE`. The regular panel comparison checks only the current, unexpanded contents of each panel and considers directories with the same name and type to match. The separate recursive comparison (`F12`) checks path, type, size, and modification date when available. It does not compare file contents byte for byte.
 
 ## SFTP/FTP panels and synchronization
 
@@ -117,7 +131,7 @@ Remote panels support listing, previewing, editing with download and upload, cre
 
 ## Shortcut configuration
 
-Main actions can be assigned to different keys in `twin-commander/shortcuts.json` in the user's configuration directory, or in a file specified by `TWIN_COMMANDER_SHORTCUTS_FILE`. For example:
+Main actions can be assigned to different keys in `shortcuts.json` in the selected configuration directory, or in a file specified by `TWIN_COMMANDER_SHORTCUTS_FILE`. For example:
 
 ```json
 {
@@ -130,7 +144,7 @@ Each action has one shortcut. Available action names are `help`, `user_menu`, `m
 
 `Esc` still cancels dialogs and opens exit confirmation in the main view regardless of the configuration. Help and the bottom bar describe the default shortcuts; after reassignment, the configuration file takes precedence.
 
-The interface has two distinct color themes: Kanso Pearl for light mode and Kanso Mist for dark mode. Their TOML definitions are in `config/themes/`, in files prefixed with `light_` and `dark_`. The application loads default and custom themes from TOML files at startup without recompilation. It looks for default files in `config/themes/` relative to the current working directory, then in `share/twin-commander/themes/` or `config/themes/` next to the executable's directory. When moving the executable, move the themes directory with it.
+The interface has two distinct color themes: Kanso Pearl for light mode and Kanso Mist for dark mode. Their bundled TOML definitions are in `config/themes/`, in files prefixed with `light_` and `dark_`. The application loads themes at startup without recompilation. It overlays matching files from `~/.config/twin-commander/themes/` when that directory exists. Otherwise it uses the bundled files from `config/themes/` relative to the current working directory, then `share/twin-commander/themes/` or `config/themes/` next to the executable's directory. When moving the executable, move the bundled themes directory with it.
 
 The application uses `CSI ? 996 n` preference reports and mode `2031` notifications to switch themes immediately when settings change. For older terminals, it periodically queries the background color with OSC 11. On macOS, terminals that support neither mechanism use the system appearance setting directly. On other systems, they keep the dark theme. A terminal response of “no preference” keeps the current theme.
 
@@ -158,7 +172,7 @@ bold = false
 Select custom files for either appearance:
 
 ```sh
-TWIN_COMMANDER_DARK_THEME=config/themes/examples/dark_amber.toml make run
+TWIN_COMMANDER_DARK_THEME=$HOME/.config/twin-commander/themes/dark_amber.toml make run
 TWIN_COMMANDER_LIGHT_THEME=/absolute/path/my_light.toml make run
 ```
 

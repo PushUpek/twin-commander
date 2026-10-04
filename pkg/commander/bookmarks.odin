@@ -13,11 +13,7 @@ begin_bookmarks :: proc(app: ^App_State) {
 
 bookmarks_load :: proc(app: ^App_State) {
 	path := os.get_env("TWIN_COMMANDER_BOOKMARKS_FILE", context.temp_allocator)
-	if len(path) == 0 {
-		config_dir, err := os.user_config_dir(context.temp_allocator)
-		if err != nil do return
-		path = filepath.join({config_dir, "twin-commander", "bookmarks"}, context.temp_allocator) or_else ""
-	}
+	if len(path) == 0 do path = user_config_file("bookmarks")
 	if len(path) == 0 do return
 	bookmarks_load_file(app, path)
 }
@@ -41,7 +37,8 @@ bookmarks_load_file :: proc(app: ^App_State, path: string) {
 bookmarks_save :: proc(app: ^App_State) -> bool {
 	if len(app.bookmarks_file) == 0 do return true
 	directory := filepath.dir(app.bookmarks_file)
-	if err := os.make_directory_all(directory); err != nil do return false
+	if err := os.make_directory_all(directory); err != nil && err != .Exist do return false
+	if !config_directory_exists(directory) do return false
 	builder := strings.builder_make()
 	defer strings.builder_destroy(&builder)
 	for path in app.bookmarks {
