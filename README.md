@@ -2,6 +2,18 @@
 
 Twin Commander is a modern two-panel file manager inspired by Norton Commander and written in [Odin](https://odin-lang.org/).
 
+![Twin Commander with two directory panels and the Kanso Mist dark theme](docs/screenshots/panels-dark.png)
+
+Browse two directories side by side, preview files, and copy or move items with keyboard shortcuts. Launch with `twin-commander` or `tc`.
+
+## Screenshots
+
+| Kanso Pearl light theme | JSON viewer |
+| --- | --- |
+| ![Twin Commander with the Kanso Pearl light theme](docs/screenshots/panels-light.png) | ![Built-in JSON viewer with formatting, syntax highlighting, and line numbers](docs/screenshots/json-viewer.png) |
+
+Captured from Twin Commander 0.2.1 terminal sessions with sample files. The JSON viewer formats and highlights content without changing the source file. Click an image to view it at full size.
+
 ## Building
 
 The Odin compiler must be available in `PATH`.
