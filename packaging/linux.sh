@@ -15,6 +15,7 @@ chmod +x stage/bin/twin-commander
 deb_root=$(mktemp -d)
 trap 'rm -rf "$deb_root"' EXIT
 install -Dm755 stage/bin/twin-commander "$deb_root/usr/bin/twin-commander"
+ln -s twin-commander "$deb_root/usr/bin/tc"
 mkdir -p "$deb_root/usr/share/twin-commander"
 cp -R stage/share/twin-commander/themes "$deb_root/usr/share/twin-commander/"
 mkdir -p "$deb_root/DEBIAN"
@@ -53,11 +54,13 @@ tar -xzf %{SOURCE0}
 
 %install
 install -Dm755 bin/twin-commander %{buildroot}/usr/bin/twin-commander
+ln -s twin-commander %{buildroot}/usr/bin/tc
 mkdir -p %{buildroot}/usr/share/twin-commander
 cp -R share/twin-commander/themes %{buildroot}/usr/share/twin-commander/
 
 %files
 /usr/bin/twin-commander
+/usr/bin/tc
 /usr/share/twin-commander/themes
 EOF
 rpmbuild --define "_topdir $rpm_root" -bb "$rpm_root/SPECS/twin-commander.spec"
@@ -69,6 +72,7 @@ appdir="$appimage_root/TwinCommander.AppDir"
 trap 'rm -rf "$deb_root" "$rpm_root" "$appimage_root"' EXIT
 mkdir -p "$appdir/usr/bin" "$appdir/usr/share/twin-commander"
 cp stage/bin/twin-commander "$appdir/usr/bin/"
+ln -s twin-commander "$appdir/usr/bin/tc"
 cp -R stage/share/twin-commander/themes "$appdir/usr/share/twin-commander/"
 cp packaging/twin-commander.desktop packaging/twin-commander.svg "$appdir/"
 cat > "$appdir/AppRun" <<'EOF'

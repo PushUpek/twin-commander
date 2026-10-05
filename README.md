@@ -14,6 +14,8 @@ The executable is built in `build/`.
 
 ## Packages and releases
 
+After installing with Homebrew, APT, or DNF, launch the application with `twin-commander` or its shorter alias `tc`. The macOS archives also include `bin/tc`. The standalone AppImage is launched using its downloaded filename.
+
 The `Build packages` workflow runs tests on macOS ARM, macOS Intel, and Linux x86-64. A `vX.Y.Z` tag publishes these files in GitHub Releases:
 
 - `twin-commander-macos-arm64.tar.gz` for Apple Silicon,
@@ -23,16 +25,53 @@ The `Build packages` workflow runs tests on macOS ARM, macOS Intel, and Linux x8
 
 The macOS archives contain `bin/twin-commander` and `share/twin-commander/themes`. After extracting an archive, run `bin/twin-commander` from an interactive terminal. The macOS binaries are not yet signed or notarized.
 
-Homebrew can build the current version from `main`:
+Homebrew builds the latest stable release (the formula pins both its tag and commit):
 
 ```sh
 brew tap pushupek/twin-commander https://github.com/PushUpek/twin-commander.git
-brew install --HEAD pushupek/twin-commander/twin-commander
+brew install pushupek/twin-commander/twin-commander
 ```
 
-The formula uses Homebrew's `odin` compiler. There is not yet a versioned formula or a separate tap repository with automatic updates.
+The formula uses Homebrew's `odin` compiler. Use `brew install --HEAD pushupek/twin-commander/twin-commander` to build `main` instead. After publishing a stable GitHub release, Actions updates the formula on `main`. Run `brew update` followed by `brew upgrade twin-commander` to pick up new versions. The workflow refuses to downgrade the formula when an older release is rerun.
 
-On Debian or Ubuntu, install the downloaded `.deb` with `sudo apt install ./file.deb`. On RPM-based systems, install the downloaded `.rpm` with `sudo dnf install ./file.rpm`. These files do not create signed APT or DNF repositories, so they do not provide automatic updates. The AppImage is an executable file that can be launched from a terminal; desktop integration requires an environment that supports AppImage.
+On Debian or Ubuntu, install the downloaded `.deb` with `sudo apt install ./file.deb`. On RPM-based systems, install the downloaded `.rpm` with `sudo dnf install ./file.rpm`. Once the repository publishing setup below is complete, APT and DNF can also receive updates from signed repositories on GitHub Pages. AppImage remains a standalone release download; it does not currently have an automatic updater.
+
+### One-time publishing setup
+
+GitHub Pages and the signing secrets are configured for this repository. The public signing key is checked in as `packaging/signing-key.asc`; its fingerprint is `0B4D B487 8B4A D0FE E686 B3A7 2EA6 47EA BB56 049A` and it expires on 2028-10-04. The first repository deployment requires a new release containing these changes. The steps below describe how to reproduce the setup or configure a fork.
+
+1. Enable GitHub Pages with **GitHub Actions** as its source. Pages availability for a private repository depends on the account plan, and a Pages site may be public even when its source repository is private. Confirm that the packages can be publicly distributed before enabling publication.
+2. Create a dedicated GPG signing key on a trusted machine, retain a backup, and record its fingerprint. For example: `gpg --quick-generate-key 'Twin Commander packages <YOUR_EMAIL>' rsa4096 sign 2y`. Export its ASCII-armored private key with `gpg --armor --export-secret-keys FINGERPRINT` and store the complete output as the Actions secret `REPOSITORY_SIGNING_KEY`. Store its passphrase as `REPOSITORY_SIGNING_PASSPHRASE`. Renew the key before expiration and keep the same key across releases so existing clients continue to trust updates. Never commit the private key.
+3. Set the Actions repository variable `ENABLE_PACKAGE_REPOSITORIES` to `true`. The next `vX.Y.Z` release will publish signed APT and RPM repositories. Without this variable, GitHub Releases and Homebrew updates still run. Repository generation and signature checks run in CI with a temporary key even when publication is disabled.
+4. Allow the Actions bot to push formula updates to `main` (including any branch protection requirements). The workflow uses the repository's `GITHUB_TOKEN` with `contents: write`; it does not need a personal access token. A protected branch that rejects this push will fail the Homebrew job visibly.
+
+The Pages URL is normally `https://pushupek.github.io/twin-commander`. Use the actual Pages URL if a custom domain is configured. Each deployment contains the current stable Linux x86-64 packages; GitHub Releases retains older downloads. Rerunning a release that is no longer the latest stable release does not republish its repositories. Publish a new `vX.Y.Z` tag containing this workflow and its packaging scripts to start the automation. After that, publishing can be retried by running **Build packages** manually with the release tag selected.
+
+### Install from APT
+
+After the first successful Pages deployment, download the public key and compare its fingerprint with the maintainer's independently published fingerprint:
+
+```sh
+curl -fsSL https://pushupek.github.io/twin-commander/signing-key.asc -o /tmp/twin-commander-key.asc
+gpg --show-keys --with-fingerprint /tmp/twin-commander-key.asc
+sudo install -m 644 /tmp/twin-commander-key.asc /usr/share/keyrings/twin-commander.asc
+echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/twin-commander.asc] https://pushupek.github.io/twin-commander/apt stable main' | sudo tee /etc/apt/sources.list.d/twin-commander.list
+sudo apt update
+sudo apt install twin-commander
+```
+
+Subsequent releases are installed by the usual `sudo apt upgrade`.
+
+### Install from DNF
+
+After checking the same signing key fingerprint:
+
+```sh
+sudo curl -fsSL https://pushupek.github.io/twin-commander/twin-commander.repo -o /etc/yum.repos.d/twin-commander.repo
+sudo dnf install twin-commander
+```
+
+Both package signatures and repository metadata signatures are required. Subsequent releases are installed by `sudo dnf upgrade twin-commander`.
 
 Windows releases (`.exe`, `.zip`, and an installer) require a Windows port of the terminal layer and the POSIX operations used by the application. The current code does not build natively on Windows, so the workflow does not publish a nonfunctional Windows file. After the port, a portable `.zip` and an Inno Setup installer would be a practical pair; the `.exe` can be included in both.
 

@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     strategy:
@@ -37,6 +41,7 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Test and build
         run: |
+          python3 -m unittest discover -s packaging -p 'test_*.py'
           make test
           make build
           mkdir -p stage/bin stage/share/twin-commander
@@ -69,6 +74,8 @@ jobs:
           cp -R arm64/share/twin-commander/themes universal/share/twin-commander/
           lipo -create arm64/bin/twin-commander amd64/bin/twin-commander -output universal/bin/twin-commander
           lipo universal/bin/twin-commander -verify_arch arm64 x86_64
+          ln -s twin-commander arm64/bin/tc
+          ln -s twin-commander universal/bin/tc
           tar -C arm64 -czf dist/twin-commander-macos-arm64.tar.gz bin share
           tar -C universal -czf dist/twin-commander-macos-universal.tar.gz bin share
       - uses: actions/upload-artifact@v6
@@ -86,14 +93,28 @@ jobs:
         with:
           name: stage-linux-amd64
           path: stage
-      - name: Install RPM packaging tools
+      - name: Install packaging and repository tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm
+          sudo apt-get install -y rpm apt-utils createrepo-c gnupg
       - name: Create Linux packages
         env:
           VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0' }}
         run: bash packaging/linux.sh
+      - name: Verify signed repositories with a temporary key
+        run: |
+          set -euo pipefail
+          export GNUPGHOME
+          GNUPGHOME=$(mktemp -d)
+          trap 'rm -rf "$GNUPGHOME"' EXIT
+          chmod 700 "$GNUPGHOME"
+          export REPOSITORY_SIGNING_PASSPHRASE=ci-test-passphrase
+          gpg --batch --pinentry-mode loopback --passphrase "$REPOSITORY_SIGNING_PASSPHRASE" --quick-generate-key 'CI package signing' rsa2048 sign 1d
+          export REPOSITORY_SIGNING_KEY
+          REPOSITORY_SIGNING_KEY=$(gpg --batch --pinentry-mode loopback --passphrase "$REPOSITORY_SIGNING_PASSPHRASE" --armor --export-secret-keys)
+          export REPOSITORY_URL=https://example.invalid/twin-commander
+          bash packaging/repositories.sh dist test-site
+          bash packaging/verify-repositories.sh test-site
       - uses: actions/upload-artifact@v6
         with:
           name: packages-linux
@@ -124,3 +145,92 @@ jobs:
             gh release create "$TAG" --verify-tag --generate-notes
           fi
           gh release upload "$TAG" dist/* --clobber
+
+  homebrew:
+    needs: release
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    concurrency:
+      group: homebrew-stable
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: Update stable formula
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git fetch origin "refs/tags/$TAG:refs/tags/$TAG"
+          # Rerunning an older release must not replace the current stable formula.
+          if [[ $(gh release view --json tagName --jq .tagName) != "$TAG" ]]; then
+            echo "Skipping a release that is not the latest stable release"
+            exit 0
+          fi
+          python3 packaging/update-homebrew.py "$TAG" "$(git rev-parse "$TAG^{commit}")"
+          ruby -c Formula/twin-commander.rb
+          if git diff --quiet -- Formula/twin-commander.rb; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Formula/twin-commander.rb
+          git commit -m "Update Homebrew formula to $TAG"
+          git push origin HEAD:main
+
+  repositories:
+    needs: release
+    if: vars.ENABLE_PACKAGE_REPOSITORIES == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: package-repositories
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check latest stable release
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ $(gh release view --json tagName --jq .tagName) == "$TAG" ]]; then
+            echo 'publish=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/configure-pages@v5
+        if: steps.latest.outputs.publish == 'true'
+        id: pages
+      - name: Download published Linux packages
+        if: steps.latest.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: gh release download "$TAG" --pattern '*.deb' --pattern '*.rpm' --dir dist
+      - name: Build signed repositories
+        if: steps.latest.outputs.publish == 'true'
+        env:
+          REPOSITORY_SIGNING_KEY: ${{ secrets.REPOSITORY_SIGNING_KEY }}
+          REPOSITORY_SIGNING_PASSPHRASE: ${{ secrets.REPOSITORY_SIGNING_PASSPHRASE }}
+          REPOSITORY_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils createrepo-c rpm gnupg
+          bash packaging/repositories.sh
+          bash packaging/verify-repositories.sh site
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.latest.outputs.publish == 'true'
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        if: steps.latest.outputs.publish == 'true'
+        id: deployment
