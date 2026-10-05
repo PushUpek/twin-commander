@@ -2,9 +2,9 @@ class TwinCommander < Formula
   desc "Two-panel terminal file manager written in Odin"
   homepage "https://github.com/PushUpek/twin-commander"
   url "https://github.com/PushUpek/twin-commander.git",
-      tag: "v0.2.0",
-      revision: "e3643b6de0dc5883547c9e1e9f1b434aac9e150f"
-  version "0.2.0"
+      tag: "v0.2.1",
+      revision: "bcc46b95a230c0a2cce79d80f409d297cf3e5c5f"
+  version "0.2.1"
   head "https://github.com/PushUpek/twin-commander.git", branch: "main"
 
   depends_on "odin" => :build
